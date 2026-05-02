@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en" class="h-full">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>AI Helpdesk Ticket Assistant</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body class="h-full bg-slate-50 text-slate-900 antialiased">
+    <div class="min-h-full">
+      <!-- Top bar -->
+      <header class="border-b border-slate-200 bg-white/80 backdrop-blur sticky top-0 z-10">
+        <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+          <div class="flex items-center gap-3">
+            <div class="h-9 w-9 rounded-lg bg-gradient-to-br from-indigo-500 to-violet-600 grid place-items-center text-white font-bold">AI</div>
+            <div>
+              <h1 class="text-base font-semibold leading-tight">Helpdesk Ticket Assistant</h1>
+              <p class="text-xs text-slate-500">Triage · Resolve · Reply</p>
+            </div>
+          </div>
+          <div class="flex items-center gap-2">
+            <span id="ai-badge" class="hidden sm:inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium"></span>
+            <button
+              id="new-ticket-btn"
+              class="inline-flex items-center gap-1.5 rounded-md bg-slate-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-slate-700"
+            >
+              <span class="text-base leading-none">+</span> New ticket
+            </button>
+          </div>
+        </div>
+      </header>
+
+      <main class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8">
+        <!-- Stats -->
+        <section id="stats" class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-8"></section>
+
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          <!-- Left: list + upload -->
+          <section class="lg:col-span-5 space-y-6">
+            <div class="rounded-xl border border-slate-200 bg-white shadow-sm">
+              <div class="p-4 border-b border-slate-200 flex items-center justify-between">
+                <div>
+                  <h2 class="text-sm font-semibold">Import tickets</h2>
+                  <p class="text-xs text-slate-500">CSV with columns: subject, body, requester</p>
+                </div>
+                <a href="/sample_tickets.csv" download class="text-xs font-medium text-indigo-600 hover:underline">Sample CSV</a>
+              </div>
+              <div class="p-4">
+                <label
+                  for="csv-input"
+                  class="flex flex-col items-center justify-center cursor-pointer rounded-lg border-2 border-dashed border-slate-300 bg-slate-50 hover:bg-slate-100 px-4 py-6 text-center"
+                >
+                  <span class="text-sm font-medium text-slate-700">Drop CSV here or click to upload</span>
+                  <span id="upload-status" class="mt-1 text-xs text-slate-500">No file selected</span>
+                </label>
+                <input id="csv-input" type="file" accept=".csv" class="hidden" />
+              </div>
+            </div>
+
+            <div class="rounded-xl border border-slate-200 bg-white shadow-sm">
+              <div class="p-4 border-b border-slate-200 flex items-center justify-between">
+                <h2 class="text-sm font-semibold">Tickets</h2>
+                <button id="clear-btn" class="text-xs text-slate-500 hover:text-rose-600">Clear all</button>
+              </div>
+              <ul id="ticket-list" class="divide-y divide-slate-100 max-h-[60vh] overflow-y-auto">
+                <li class="p-6 text-sm text-slate-500 text-center">Loading…</li>
+              </ul>
+            </div>
+          </section>
+
+          <!-- Right: detail -->
+          <section class="lg:col-span-7">
+            <div id="detail" class="rounded-xl border border-slate-200 bg-white shadow-sm min-h-[60vh]">
+              <div class="p-10 text-center text-sm text-slate-500">
+                Select a ticket on the left to triage it.
+              </div>
+            </div>
+          </section>
+        </div>
+      </main>
+    </div>
+
+    <!-- New ticket modal -->
+    <div id="modal" class="fixed inset-0 z-20 hidden bg-slate-900/50 backdrop-blur-sm">
+      <div class="mx-auto mt-24 w-full max-w-lg rounded-xl bg-white shadow-xl">
+        <div class="p-5 border-b border-slate-200 flex items-center justify-between">
+          <h3 class="text-base font-semibold">New ticket</h3>
+          <button data-close class="text-slate-400 hover:text-slate-700">✕</button>
+        </div>
+        <form id="new-ticket-form" class="p-5 space-y-4">
+          <div>
+            <label class="text-xs font-medium text-slate-600">Subject</label>
+            <input name="subject" required class="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500" />
+          </div>
+          <div>
+            <label class="text-xs font-medium text-slate-600">Requester email</label>
+            <input name="requester" type="email" placeholder="user@company.com" class="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500" />
+          </div>
+          <div>
+            <label class="text-xs font-medium text-slate-600">Description</label>
+            <textarea name="body" required rows="6" class="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"></textarea>
+          </div>
+          <div class="flex justify-end gap-2 pt-2">
+            <button type="button" data-close class="rounded-md px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-100">Cancel</button>
+            <button class="rounded-md bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-500">Create</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Toast -->
+    <div id="toast" class="fixed bottom-6 right-6 z-30 hidden rounded-lg bg-slate-900 px-4 py-2 text-sm text-white shadow-lg"></div>
+
+    <script src="/app.js"></script>
+  </body>
+</html>

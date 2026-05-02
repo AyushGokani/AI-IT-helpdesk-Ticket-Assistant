@@ -1,0 +1,22 @@
+html, body { font-family: 'Inter', system-ui, -apple-system, sans-serif; }
+
+/* Subtle fade for newly inserted content */
+.fade-in { animation: fade-in 0.18s ease-out; }
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(2px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Pretty scrollbars */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 999px; }
+::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+/* Reply draft preformatted text */
+.reply-pre {
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 0.875rem;
+  line-height: 1.5;
+}

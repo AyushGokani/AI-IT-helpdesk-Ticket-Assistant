@@ -1,0 +1,11 @@
+subject,body,requester
+"VPN keeps disconnecting","My Cisco AnyConnect VPN drops every 5-10 minutes since this morning. Internet itself works fine. I need this for production access urgently.",alex.morgan@acme.com
+"Cannot log in to Okta","I'm getting 'account locked' when trying to sign in to Okta SSO. I tried resetting my password but didn't receive the email.",priya.shah@acme.com
+"Laptop won't turn on","Dell XPS 13 — pressed power, no lights, no fan. Tried a different charger, no luck. Was working yesterday.",jordan.lee@acme.com
+"Outlook stuck on 'Trying to connect'","Outlook 365 has shown 'Trying to connect…' for the last hour. Webmail works fine. Restarted the laptop already.",sam.kim@acme.com
+"Need access to finance shared drive","Hi, I just moved to the FP&A team. Could I get read/write access to \\fileshare\\finance? My manager Lisa approved.",dani.rivera@acme.com
+"Slack desktop crashes on launch","Slack desktop client crashes immediately when I open it. Browser version works. Windows 11.",chris.wong@acme.com
+"Shared mailbox not receiving emails","Our team mailbox support@acme.com hasn't received any new mail since 9am. Customers are complaining.",ops.team@acme.com
+"How do I install Tableau?","No rush — I'd like Tableau Desktop installed when you have a chance. Whenever is fine.",morgan.taylor@acme.com
+"Wi-Fi outage in floor 3","All users on floor 3 lost Wi-Fi about 10 minutes ago. Wired works. This is blocking the whole engineering team.",noc@acme.com
+"Invoice question","Got two charges for the Zoom subscription this month — could someone in billing take a look?",fin.helpdesk@acme.com
