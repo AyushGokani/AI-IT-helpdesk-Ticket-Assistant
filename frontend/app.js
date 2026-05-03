@@ -19,6 +19,7 @@ const api = {
   async setStatus(id, status) { return (await fetch(`/api/tickets/${id}/status`, jsonPost({ status }))).json(); },
   async remove(id)            { return (await fetch(`/api/tickets/${id}`, { method: "DELETE", cache: "no-store" })).json(); },
   async clear()               { return (await fetch("/api/tickets/clear", { method: "POST", cache: "no-store" })).json(); },
+  async seed()                { return (await fetch("/api/tickets/seed",  { method: "POST", cache: "no-store" })).json(); },
   async stats()               { return (await fetch("/api/stats", NO_CACHE)).json(); },
 };
 
@@ -104,6 +105,16 @@ function bindUi() {
     if (!confirm("Delete ALL tickets? This cannot be undone.")) return;
     await api.clear();
     state.selectedId = null;
+    await refresh();
+  });
+
+  document.getElementById("seed-btn").addEventListener("click", async () => {
+    const res = await api.seed();
+    if (res.inserted) {
+      toast(`Loaded ${res.inserted} demo tickets`);
+    } else {
+      toast("Already populated — clear first to reseed");
+    }
     await refresh();
   });
 

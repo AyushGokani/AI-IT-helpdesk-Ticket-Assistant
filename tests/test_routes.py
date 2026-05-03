@@ -127,3 +127,23 @@ def test_clear(client):
     client.post("/api/tickets", json={"subject": "a", "body": "b"})
     client.post("/api/tickets/clear")
     assert client.get("/api/tickets").get_json() == []
+
+
+def test_seed_endpoint_only_populates_when_empty(client):
+    res = client.post("/api/tickets/seed")
+    body = res.get_json()
+    assert body["ok"] is True
+    assert body["inserted"] >= 1
+    first = body["inserted"]
+
+    # Second call should be a no-op since the store is no longer empty
+    res = client.post("/api/tickets/seed")
+    assert res.get_json()["inserted"] == 0
+
+    # Sanity: the previously-seeded count is still there
+    assert len(client.get("/api/tickets").get_json()) == first
+
+
+def test_no_cache_headers_on_api(client):
+    res = client.get("/api/tickets")
+    assert "no-store" in res.headers.get("Cache-Control", "")
