@@ -4,8 +4,11 @@
 #
 # Free tier notes:
 #   - Spins down after 15 minutes of inactivity (~30s cold start on next visit).
-#   - Disk is ephemeral. We persist tickets to a tiny mounted disk so the
-#     live demo doesn't lose data on each redeploy.
+#   - File system is ephemeral: ticket data resets on every redeploy / restart.
+#     For a portfolio demo this is fine — SEED_DEMO_DATA=1 re-populates the
+#     queue with 8 example tickets on every cold boot.
+#   - To make data permanent, upgrade to a paid plan and re-add a `disk:` block
+#     mounted at /var/data, plus set DATA_DIR=/var/data.
 services:
   - type: web
     name: triagent
@@ -29,9 +32,3 @@ services:
         value: gpt-4o-mini
       - key: SEED_DEMO_DATA
         value: "1"
-      - key: DATA_DIR
-        value: /var/data
-    disk:
-      name: ticket-data
-      mountPath: /var/data
-      sizeGB: 1
