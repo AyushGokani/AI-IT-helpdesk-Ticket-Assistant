@@ -1,0 +1,37 @@
+# Render Blueprint for one-click deploy.
+# Use the "Deploy to Render" button in the README, or push to a connected repo
+# and Render will auto-detect this file.
+#
+# Free tier notes:
+#   - Spins down after 15 minutes of inactivity (~30s cold start on next visit).
+#   - Disk is ephemeral. We persist tickets to a tiny mounted disk so the
+#     live demo doesn't lose data on each redeploy.
+services:
+  - type: web
+    name: ai-helpdesk-ticket-assistant
+    runtime: python
+    plan: free
+    region: oregon
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn wsgi:app --workers 2 --bind 0.0.0.0:$PORT --timeout 60
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.7
+      - key: FLASK_DEBUG
+        value: "0"
+      - key: FLASK_SECRET_KEY
+        generateValue: true
+      - key: OPENAI_API_KEY
+        sync: false   # set this manually in the Render dashboard
+      - key: OPENAI_MODEL
+        value: gpt-4o-mini
+      - key: SEED_DEMO_DATA
+        value: "1"
+      - key: DATA_DIR
+        value: /var/data
+    disk:
+      name: ticket-data
+      mountPath: /var/data
+      sizeGB: 1

@@ -5,6 +5,7 @@ from __future__ import annotations
 from flask import Blueprint, current_app, jsonify, request
 
 from . import ai
+from .seed import maybe_seed
 from .storage import TicketStore, parse_csv
 
 bp = Blueprint("api", __name__, url_prefix="/api")
@@ -110,6 +111,13 @@ def delete_ticket(ticket_id: str):
 def clear_tickets():
     _store().clear()
     return {"ok": True}
+
+
+@bp.post("/tickets/seed")
+def seed_tickets():
+    """Re-seed demo data. Useful on a public live demo after Clear all."""
+    inserted = maybe_seed(_store())
+    return {"ok": True, "inserted": inserted}
 
 
 @bp.get("/stats")

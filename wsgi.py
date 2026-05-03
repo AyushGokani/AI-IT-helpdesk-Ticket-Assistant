@@ -1,4 +1,8 @@
-"""Production / dev entrypoint: ``python wsgi.py``."""
+"""Entrypoint.
+
+- Local dev:  ``python wsgi.py`` (Flask dev server, debug ON by default).
+- Production: ``gunicorn wsgi:app`` (gunicorn imports ``app`` directly).
+"""
 
 from app import create_app
 
