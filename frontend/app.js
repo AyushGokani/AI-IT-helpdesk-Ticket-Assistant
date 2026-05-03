@@ -1,17 +1,25 @@
 // AI Helpdesk Ticket Assistant — vanilla JS frontend.
 // AI calls are triggered ONLY when the user clicks "Generate AI triage".
 
+const NO_CACHE = { cache: "no-store", headers: { "cache-control": "no-cache" } };
+const jsonPost = (body) => ({
+  method: "POST",
+  cache: "no-store",
+  headers: { "content-type": "application/json", "cache-control": "no-cache" },
+  body: JSON.stringify(body),
+});
+
 const api = {
-  async health()              { return (await fetch("/api/health")).json(); },
-  async list()                { return (await fetch("/api/tickets")).json(); },
-  async get(id)               { return (await fetch(`/api/tickets/${id}`)).json(); },
-  async create(payload)       { return (await fetch("/api/tickets", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(payload) })).json(); },
-  async upload(file)          { const fd = new FormData(); fd.append("file", file); return (await fetch("/api/tickets/upload", { method: "POST", body: fd })).json(); },
-  async analyze(id, offline)  { return (await fetch(`/api/tickets/${id}/analyze`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ offline: !!offline }) })).json(); },
-  async setStatus(id, status) { return (await fetch(`/api/tickets/${id}/status`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ status }) })).json(); },
-  async remove(id)            { return (await fetch(`/api/tickets/${id}`, { method: "DELETE" })).json(); },
-  async clear()               { return (await fetch("/api/tickets/clear", { method: "POST" })).json(); },
-  async stats()               { return (await fetch("/api/stats")).json(); },
+  async health()              { return (await fetch("/api/health", NO_CACHE)).json(); },
+  async list()                { return (await fetch("/api/tickets", NO_CACHE)).json(); },
+  async get(id)               { return (await fetch(`/api/tickets/${id}`, NO_CACHE)).json(); },
+  async create(payload)       { return (await fetch("/api/tickets", jsonPost(payload))).json(); },
+  async upload(file)          { const fd = new FormData(); fd.append("file", file); return (await fetch("/api/tickets/upload", { method: "POST", cache: "no-store", body: fd })).json(); },
+  async analyze(id, offline)  { return (await fetch(`/api/tickets/${id}/analyze`, jsonPost({ offline: !!offline }))).json(); },
+  async setStatus(id, status) { return (await fetch(`/api/tickets/${id}/status`, jsonPost({ status }))).json(); },
+  async remove(id)            { return (await fetch(`/api/tickets/${id}`, { method: "DELETE", cache: "no-store" })).json(); },
+  async clear()               { return (await fetch("/api/tickets/clear", { method: "POST", cache: "no-store" })).json(); },
+  async stats()               { return (await fetch("/api/stats", NO_CACHE)).json(); },
 };
 
 const CATEGORY_STYLES = {
