@@ -8,7 +8,7 @@
 #     live demo doesn't lose data on each redeploy.
 services:
   - type: web
-    name: ai-helpdesk-ticket-assistant
+    name: triagent
     runtime: python
     plan: free
     region: oregon
