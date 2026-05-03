@@ -4,6 +4,10 @@
 > get a category, priority, suggested resolution steps, and a ready-to-send reply
 > draft. AI calls fire **only** on click, so it stays cheap (or free) to run.
 
+### 🔗 Live demo: **https://triagent-n3ok.onrender.com**
+
+*Free tier — first request after idle takes ~30s to wake.*
+
 [![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy)
 
 For each ticket Triagent will:
@@ -107,7 +111,7 @@ While viewing a ticket: **→ / ↓ / J** for next, **← / ↑ / K** for previo
 ## Deploy live in 5 minutes (Render — free tier)
 
 This repo includes a `render.yaml`, so Render auto-configures everything and
-your service ends up at **`https://triagent.onrender.com`** (or
+your service ends up at **`https://triagent-n3ok.onrender.com`** (or
 `https://triagent-<random>.onrender.com` if `triagent` is taken; you can rename
 later in Settings).
 
@@ -119,7 +123,7 @@ later in Settings).
 4. Render reads `render.yaml`, names the service `triagent`, and shows you the env vars it'll create.
 5. The only var you need to fill in manually is `OPENAI_API_KEY` (the rest auto-generate or have defaults). Paste your `sk-...` key. **Or leave it blank and the live demo runs in heuristic mode for free.**
 6. Click **Apply**. First build takes ~3 minutes.
-7. You'll get a public URL like `https://triagent.onrender.com`.
+7. You'll get a public URL like `https://triagent-n3ok.onrender.com`.
 
 That's it — Triagent is online with HTTPS, auto-deploys on every push to `main`, and seeds 8 example tickets on first boot so visitors immediately see something useful.
 
@@ -127,7 +131,7 @@ That's it — Triagent is online with HTTPS, auto-deploys on every push to `main
 
 - The service spins down after 15 minutes of inactivity → ~30s cold start on next visit.
 - 1 GB of persistent disk for ticket data, mounted at `/var/data` (configured in `render.yaml`).
-- Add this line to your README: *"Live demo: https://triagent.onrender.com (first request may take 30s to wake)."*
+- Add this line to your README: *"Live demo: https://triagent-n3ok.onrender.com (first request may take 30s to wake)."*
 
 ### Custom domain (optional, ~$10/year)
 
@@ -154,7 +158,7 @@ Just set the same env vars (`OPENAI_API_KEY`, `FLASK_SECRET_KEY`, `OPENAI_MODEL`
 
 ### Resume — fuller version (3 bullets)
 
-**Triagent — AI Helpdesk Ticket Assistant** | *Personal project* | [Live demo](https://triagent.onrender.com) · [GitHub](https://github.com/AyushGokani/AI-IT-helpdesk-Ticket-Assistant)
+**Triagent — AI Helpdesk Ticket Assistant** | *Personal project* | [Live demo](https://triagent-n3ok.onrender.com) · [GitHub](https://github.com/AyushGokani/AI-IT-helpdesk-Ticket-Assistant)
 - Designed and shipped a full-stack IT support triage tool (Python · Flask · OpenAI SDK · vanilla JS / Tailwind SPA), deployed on Render with auto-deploy CI on every push.
 - Engineered an **on-demand-only** AI architecture so token spend is gated behind a single user action, with a keyword-classifier fallback that keeps the app fully functional on $0 of API credit.
 - Built REST API for ticket CRUD, CSV bulk import, classification, priority scoring, and reply drafting; **17 pytest tests** cover the API and both AI paths (LLM + heuristic).
@@ -176,7 +180,7 @@ Just set the same env vars (`OPENAI_API_KEY`, `FLASK_SECRET_KEY`, `OPENAI_MODEL`
 >
 > Tech: Python 3.12 · Flask · OpenAI (gpt-4o-mini) · Tailwind · gunicorn · pytest · Render
 >
-> 🔗 Live demo: https://triagent.onrender.com
+> 🔗 Live demo: https://triagent-n3ok.onrender.com
 > 🔗 Code: https://github.com/AyushGokani/AI-IT-helpdesk-Ticket-Assistant
 
 ### LinkedIn — Launch post
@@ -195,7 +199,7 @@ Just set the same env vars (`OPENAI_API_KEY`, `FLASK_SECRET_KEY`, `OPENAI_MODEL`
 > Built this to scratch an itch from my IT support / Zendesk days. Happy to chat
 > about the design choices if anyone's curious. 💬
 >
-> 👉 Live demo (give it 30s to wake up on first request): https://triagent.onrender.com
+> 👉 Live demo (give it 30s to wake up on first request): https://triagent-n3ok.onrender.com
 > 👉 Code: https://github.com/AyushGokani/AI-IT-helpdesk-Ticket-Assistant
 
 ### Tips for the demo
