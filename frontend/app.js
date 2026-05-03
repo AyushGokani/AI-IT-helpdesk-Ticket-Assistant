@@ -106,6 +106,26 @@ function bindUi() {
     state.selectedId = null;
     await refresh();
   });
+
+  document.addEventListener("keydown", (e) => {
+    const tag = (e.target && e.target.tagName) || "";
+    if (["INPUT", "TEXTAREA", "SELECT"].includes(tag) || e.target?.isContentEditable) return;
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
+
+    if (e.key === "ArrowDown" || e.key === "ArrowRight" || e.key === "j" || e.key === "J") {
+      e.preventDefault();
+      goRelative(1);
+    } else if (e.key === "ArrowUp" || e.key === "ArrowLeft" || e.key === "k" || e.key === "K") {
+      e.preventDefault();
+      goRelative(-1);
+    } else if (e.key === "g" || e.key === "G") {
+      const btn = document.getElementById("generate-btn");
+      if (btn && !btn.disabled) {
+        e.preventDefault();
+        btn.click();
+      }
+    }
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -188,12 +208,7 @@ function renderList(tickets) {
   }).join("");
 
   ul.querySelectorAll("li[data-id]").forEach((li) => {
-    li.addEventListener("click", () => {
-      state.selectedId = li.dataset.id;
-      const t = state.tickets.find((x) => x.id === state.selectedId);
-      renderDetail(t);
-      renderList(state.tickets);
-    });
+    li.addEventListener("click", () => selectTicket(li.dataset.id));
   });
 }
 
@@ -250,8 +265,27 @@ function renderDetail(t) {
       </div>
     `;
 
+  const idx = state.tickets.findIndex((x) => x.id === t.id);
+  const total = state.tickets.length;
+  const hasPrev = idx > 0;
+  const hasNext = idx >= 0 && idx < total - 1;
+
   detail.innerHTML = `
     <div class="p-6 fade-in">
+      <div class="mb-4 flex items-center justify-between gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+        <button id="prev-btn" ${hasPrev ? "" : "disabled"}
+          class="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-slate-700 hover:bg-white disabled:opacity-40 disabled:cursor-not-allowed">
+          <span aria-hidden="true">←</span> Previous
+        </button>
+        <div class="text-xs text-slate-500">
+          Ticket <span class="font-semibold text-slate-700">${idx + 1}</span> of <span class="font-semibold text-slate-700">${total}</span>
+          <span class="hidden sm:inline ml-2 text-slate-400">· ← / → or J / K</span>
+        </div>
+        <button id="next-btn" ${hasNext ? "" : "disabled"}
+          class="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-slate-700 hover:bg-white disabled:opacity-40 disabled:cursor-not-allowed">
+          Next <span aria-hidden="true">→</span>
+        </button>
+      </div>
       <div class="flex items-start justify-between gap-4">
         <div class="min-w-0">
           <div class="flex items-center gap-2 text-xs text-slate-500">
@@ -313,6 +347,30 @@ function renderDetail(t) {
       toast("Reply copied to clipboard");
     });
   }
+
+  const prevBtn = document.getElementById("prev-btn");
+  const nextBtn = document.getElementById("next-btn");
+  if (prevBtn) prevBtn.addEventListener("click", () => goRelative(-1));
+  if (nextBtn) nextBtn.addEventListener("click", () => goRelative(1));
+}
+
+function goRelative(delta) {
+  if (!state.tickets.length) return;
+  const idx = state.tickets.findIndex((x) => x.id === state.selectedId);
+  if (idx === -1) return;
+  const nextIdx = idx + delta;
+  if (nextIdx < 0 || nextIdx >= state.tickets.length) return;
+  selectTicket(state.tickets[nextIdx].id);
+}
+
+function selectTicket(id) {
+  const t = state.tickets.find((x) => x.id === id);
+  if (!t) return;
+  state.selectedId = id;
+  renderDetail(t);
+  renderList(state.tickets);
+  const sel = document.querySelector(`#ticket-list li[data-id="${id}"]`);
+  if (sel) sel.scrollIntoView({ block: "nearest", behavior: "smooth" });
 }
 
 async function onGenerate() {
