@@ -1,25 +1,26 @@
-# AI Helpdesk Ticket Assistant
+# Triagent — AI ticket triage, on demand
+
+> An AI-powered IT helpdesk triage assistant. Drop in a ticket → click **Generate** →
+> get a category, priority, suggested resolution steps, and a ready-to-send reply
+> draft. AI calls fire **only** on click, so it stays cheap (or free) to run.
 
 [![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy)
 
-Triage IT support tickets with AI — **only when you click Generate**. Built to be
-demo-ready on zero credits (heuristic fallback) and production-ready when you
-plug in an OpenAI key.
-
-For each ticket the assistant will:
+For each ticket Triagent will:
 
 1. **Classify** the issue (network · login · hardware · software · email · access · billing · other)
 2. **Score priority** (low / medium / high / urgent)
 3. **Suggest concrete resolution steps**
 4. **Draft a polite, ready-to-send reply** to the requester
 
-> **Resume line:** *Built and deployed an AI-powered ticket triage system that
-> classifies, prioritizes, and drafts replies on demand using GPT-4o-mini —
-> reducing manual triage time per ticket by ~80% on a sample of real IT tickets.*
+> **Resume line:** *Designed and shipped Triagent — an AI-powered IT helpdesk
+> ticket triage tool that classifies, prioritizes, and drafts replies on demand
+> using GPT-4o-mini, with a keyword-heuristic fallback that keeps the live demo
+> running on $0 of API spend.*
 
 ---
 
-## Why this is cheap to run
+## Why Triagent is cheap to run
 
 - AI is **only invoked when the user clicks "Generate AI triage"** on a specific
   ticket. No background calls, no per-keystroke calls, no auto-classification on
@@ -34,7 +35,7 @@ For each ticket the assistant will:
 ## Stack
 
 - **Backend:** Python 3.12 · Flask 3 · OpenAI SDK · gunicorn (production)
-- **Storage:** JSON file (zero-config; swap for Postgres later if you want)
+- **Storage:** JSON file (zero-config; persistent disk on Render)
 - **Frontend:** single-page HTML + Tailwind (CDN) + vanilla JS — no build step
 - **Tests:** 17 pytest tests, all run in <1s
 - **Deploy:** one-click to Render (free tier) via `render.yaml`
@@ -48,7 +49,7 @@ For each ticket the assistant will:
 │   ├── seed.py         # Optional demo data on first boot
 │   └── storage.py      # JSON ticket store + CSV parser
 ├── frontend/
-│   ├── index.html      # UI shell (Tailwind)
+│   ├── index.html      # Triagent UI shell (Tailwind)
 │   ├── app.js          # SPA logic, AI calls only on Generate click
 │   ├── styles.css
 │   └── sample_tickets.csv
@@ -80,7 +81,7 @@ copy .env.example .env        # macOS/Linux: cp .env.example .env
 python wsgi.py                # → http://127.0.0.1:5000
 ```
 
-Open the app, click **+ New ticket** (or upload `frontend/sample_tickets.csv`),
+Open Triagent, click **+ New ticket** (or upload `frontend/sample_tickets.csv`),
 select a ticket, and hit **Generate AI triage**.
 
 ### Enabling real AI
@@ -105,25 +106,32 @@ While viewing a ticket: **→ / ↓ / J** for next, **← / ↑ / K** for previo
 
 ## Deploy live in 5 minutes (Render — free tier)
 
-This repo includes a `render.yaml`, so Render auto-configures everything.
+This repo includes a `render.yaml`, so Render auto-configures everything and
+your service ends up at **`https://triagent.onrender.com`** (or
+`https://triagent-<random>.onrender.com` if `triagent` is taken; you can rename
+later in Settings).
 
 ### Steps
 
 1. **Push the code to your own GitHub repo** (it's already there if you cloned this one).
 2. Sign up at [render.com](https://render.com) — you can sign in with GitHub. **No credit card required for the free tier.**
 3. Click **New → Blueprint** → **Connect** the GitHub repo.
-4. Render reads `render.yaml`, names the service `ai-helpdesk-ticket-assistant`, and shows you the env vars it'll create.
+4. Render reads `render.yaml`, names the service `triagent`, and shows you the env vars it'll create.
 5. The only var you need to fill in manually is `OPENAI_API_KEY` (the rest auto-generate or have defaults). Paste your `sk-...` key. **Or leave it blank and the live demo runs in heuristic mode for free.**
 6. Click **Apply**. First build takes ~3 minutes.
-7. You'll get a public URL like `https://ai-helpdesk-ticket-assistant.onrender.com`.
+7. You'll get a public URL like `https://triagent.onrender.com`.
 
-That's it — your live demo is online with HTTPS, auto-deploys on every push to `main`, and seeds 8 example tickets on first boot so visitors immediately see something useful.
+That's it — Triagent is online with HTTPS, auto-deploys on every push to `main`, and seeds 8 example tickets on first boot so visitors immediately see something useful.
 
 ### Free tier tradeoffs (totally fine for a portfolio demo)
 
 - The service spins down after 15 minutes of inactivity → ~30s cold start on next visit.
 - 1 GB of persistent disk for ticket data, mounted at `/var/data` (configured in `render.yaml`).
-- Add this to the README of your fork: *"Live demo: <your URL> (first request may take 30s to wake)."*
+- Add this line to your README: *"Live demo: https://triagent.onrender.com (first request may take 30s to wake)."*
+
+### Custom domain (optional, ~$10/year)
+
+Want `triagent.dev` or `helpdesk.ayushgokani.com`? Buy the domain from Cloudflare Registrar or Namecheap, then in Render: your service → **Settings** → **Custom Domains** → **Add Custom Domain** → follow the CNAME instructions. Render auto-issues a free HTTPS certificate. No extra hosting cost.
 
 ### Other hosts
 
@@ -137,29 +145,29 @@ Just set the same env vars (`OPENAI_API_KEY`, `FLASK_SECRET_KEY`, `OPENAI_MODEL`
 
 ---
 
-## Putting this on your resume & LinkedIn
+## Putting Triagent on your resume & LinkedIn
 
 ### Resume — short bullet (1 line)
 
-> **AI Helpdesk Ticket Assistant** — Python · Flask · OpenAI · React-style SPA · Render
-> Built and deployed an AI-powered IT ticket triage tool that classifies, prioritizes, and drafts replies on demand using GPT-4o-mini, with a keyword-heuristic fallback for zero-credit demos.
+> **Triagent** — Python · Flask · OpenAI · Tailwind SPA · Render
+> Built and deployed an AI-powered IT helpdesk ticket triage tool that classifies, prioritizes, and drafts replies on demand using GPT-4o-mini, with a keyword-heuristic fallback for zero-credit demos.
 
 ### Resume — fuller version (3 bullets)
 
-**AI Helpdesk Ticket Assistant** | *Personal project* | [Live demo](#) · [GitHub](#)
+**Triagent — AI Helpdesk Ticket Assistant** | *Personal project* | [Live demo](https://triagent.onrender.com) · [GitHub](https://github.com/AyushGokani/AI-IT-helpdesk-Ticket-Assistant)
 - Designed and shipped a full-stack IT support triage tool (Python · Flask · OpenAI SDK · vanilla JS / Tailwind SPA), deployed on Render with auto-deploy CI on every push.
 - Engineered an **on-demand-only** AI architecture so token spend is gated behind a single user action, with a keyword-classifier fallback that keeps the app fully functional on $0 of API credit.
 - Built REST API for ticket CRUD, CSV bulk import, classification, priority scoring, and reply drafting; **17 pytest tests** cover the API and both AI paths (LLM + heuristic).
 
 ### LinkedIn — Featured / Project section
 
-**Title:** AI Helpdesk Ticket Assistant
+**Title:** Triagent — AI Helpdesk Ticket Assistant
 **Description (paste this):**
 
-> An AI-powered triage tool for IT support tickets. Upload a ticket and the app
-> classifies the issue (network / login / hardware / etc.), assigns a priority,
-> suggests concrete resolution steps, and drafts a ready-to-send reply to the
-> requester — all with one click.
+> Triagent is an AI-powered triage tool for IT support tickets. Upload a ticket
+> and the app classifies the issue (network / login / hardware / etc.), assigns
+> a priority, suggests concrete resolution steps, and drafts a ready-to-send
+> reply to the requester — all with one click.
 >
 > Built with Python (Flask) on the backend and a single-page Tailwind + vanilla
 > JS frontend. AI calls are gated behind an explicit user action so token spend
@@ -168,27 +176,27 @@ Just set the same env vars (`OPENAI_API_KEY`, `FLASK_SECRET_KEY`, `OPENAI_MODEL`
 >
 > Tech: Python 3.12 · Flask · OpenAI (gpt-4o-mini) · Tailwind · gunicorn · pytest · Render
 >
-> 🔗 Live demo: <your-render-url>
-> 🔗 Code: https://github.com/<you>/AI-IT-helpdesk-Ticket-Assistant
+> 🔗 Live demo: https://triagent.onrender.com
+> 🔗 Code: https://github.com/AyushGokani/AI-IT-helpdesk-Ticket-Assistant
 
-### LinkedIn — Post (when you launch)
+### LinkedIn — Launch post
 
-> Just shipped a small side-project: an AI-powered helpdesk ticket triage tool 🛠️
+> Just shipped a side-project: **Triagent**, an AI-powered helpdesk ticket triage tool 🛠️
 >
 > Drop in a support ticket and it classifies the issue, scores priority, suggests
 > resolution steps, and drafts a reply you can copy-paste back to the user.
-> The trick: AI only runs when the user clicks "Generate", so token spend stays
-> tiny. A keyword classifier kicks in as a free fallback for demos.
+>
+> The design choice I'm proud of: AI **only** runs when the user clicks "Generate",
+> so token spend stays tiny — and a keyword classifier kicks in as a free fallback
+> for demos. Means the live URL works for anyone visiting without me burning credits.
 >
 > Stack: Python · Flask · OpenAI gpt-4o-mini · Tailwind · gunicorn, deployed on Render.
 >
-> Live demo (give it 30s to wake up on first request):
-> 👉 <your-render-url>
->
-> Code & write-up: <your-github-url>
->
-> Built this to scratch an itch from my IT support / Zendesk days — happy to chat
+> Built this to scratch an itch from my IT support / Zendesk days. Happy to chat
 > about the design choices if anyone's curious. 💬
+>
+> 👉 Live demo (give it 30s to wake up on first request): https://triagent.onrender.com
+> 👉 Code: https://github.com/AyushGokani/AI-IT-helpdesk-Ticket-Assistant
 
 ### Tips for the demo
 
@@ -260,3 +268,7 @@ seed-once-only behavior. Whole suite runs in under a second.
 - Background job to **batch-triage** on schedule (still gated behind a button)
 - Authentication + per-user views
 - Per-category accuracy dashboard once you have a labeled set
+
+---
+
+Built with care by [Ayush Gokani](https://github.com/AyushGokani).

@@ -1,4 +1,4 @@
-"""AI Helpdesk Ticket Assistant - Flask application factory."""
+"""Triagent - Flask application factory."""
 
 from __future__ import annotations
 
