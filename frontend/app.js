@@ -21,6 +21,13 @@ const api = {
   async clear()               { return (await fetch("/api/tickets/clear", { method: "POST", cache: "no-store" })).json(); },
   async seed()                { return (await fetch("/api/tickets/seed",  { method: "POST", cache: "no-store" })).json(); },
   async stats()               { return (await fetch("/api/stats", NO_CACHE)).json(); },
+
+  async me()                  { return (await fetch("/api/auth/me", NO_CACHE)).json(); },
+  async login(payload)        { const res = await fetch("/api/auth/login",  jsonPost(payload)); return { ok: res.ok, body: await res.json() }; },
+  async signup(payload)       { const res = await fetch("/api/auth/signup", jsonPost(payload)); return { ok: res.ok, body: await res.json() }; },
+  async logout()              { return (await fetch("/api/auth/logout", { method: "POST", cache: "no-store" })).json(); },
+  async updateName(name)      { const res = await fetch("/api/auth/me", { method: "PATCH", cache: "no-store", headers: { "content-type": "application/json" }, body: JSON.stringify({ name }) }); return { ok: res.ok, body: await res.json() }; },
+  async changePassword(p)     { const res = await fetch("/api/auth/change-password", jsonPost(p)); return { ok: res.ok, body: await res.json() }; },
 };
 
 const CATEGORY_STYLES = {
@@ -51,6 +58,8 @@ const state = {
   tickets: [],
   selectedId: null,
   aiConfigured: false,
+  user: null,
+  authMode: "login",
 };
 
 // ---------------------------------------------------------------------------
@@ -58,12 +67,186 @@ const state = {
 // ---------------------------------------------------------------------------
 
 document.addEventListener("DOMContentLoaded", async () => {
+  bindAuthUi();
   bindUi();
   const health = await api.health();
   state.aiConfigured = !!health.ai_configured;
   renderAiBadge(health);
-  await refresh();
+
+  const me = await api.me();
+  if (me.user) {
+    state.user = me.user;
+    showApp();
+    await refresh();
+  } else {
+    showAuth();
+  }
 });
+
+// ---------------------------------------------------------------------------
+// Auth UI
+// ---------------------------------------------------------------------------
+
+function showAuth() {
+  document.getElementById("auth-screen").classList.remove("hidden");
+  document.getElementById("account-menu").classList.add("hidden");
+  document.getElementById("new-ticket-btn").classList.add("hidden");
+  setAuthMode("login");
+}
+
+function showApp() {
+  document.getElementById("auth-screen").classList.add("hidden");
+  const menu = document.getElementById("account-menu");
+  menu.classList.remove("hidden");
+  document.getElementById("new-ticket-btn").classList.remove("hidden");
+  if (state.user) {
+    const initials = (state.user.name || state.user.email).trim().charAt(0).toUpperCase();
+    document.getElementById("account-avatar").textContent = initials;
+    document.getElementById("account-name").textContent = state.user.name;
+    document.getElementById("account-dd-name").textContent = state.user.name;
+    document.getElementById("account-dd-email").textContent = state.user.email;
+  }
+}
+
+function setAuthMode(mode) {
+  state.authMode = mode;
+  document.querySelectorAll(".auth-tab").forEach((b) => {
+    const active = b.dataset.authTab === mode;
+    b.classList.toggle("bg-white", active);
+    b.classList.toggle("shadow-sm", active);
+    b.classList.toggle("text-slate-900", active);
+    b.classList.toggle("text-slate-500", !active);
+  });
+  document.getElementById("auth-name-row").classList.toggle("hidden", mode !== "signup");
+  document.getElementById("auth-pw-hint").classList.toggle("hidden", mode !== "signup");
+  document.getElementById("auth-submit").textContent = mode === "signup" ? "Create account" : "Sign in";
+  document.getElementById("auth-error").classList.add("hidden");
+  const pwInput = document.querySelector('#auth-form input[name="password"]');
+  if (pwInput) pwInput.autocomplete = mode === "signup" ? "new-password" : "current-password";
+}
+
+function bindAuthUi() {
+  document.querySelectorAll(".auth-tab").forEach((b) => {
+    b.addEventListener("click", () => setAuthMode(b.dataset.authTab));
+  });
+
+  document.getElementById("auth-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const submit = document.getElementById("auth-submit");
+    const errEl = document.getElementById("auth-error");
+    const fd = new FormData(e.currentTarget);
+    const payload = Object.fromEntries(fd.entries());
+    submit.disabled = true;
+    const original = submit.textContent;
+    submit.textContent = state.authMode === "signup" ? "Creating account…" : "Signing in…";
+    errEl.classList.add("hidden");
+    try {
+      const fn = state.authMode === "signup" ? api.signup : api.login;
+      const { ok, body } = await fn(payload);
+      if (!ok) {
+        errEl.textContent = body.error || "Something went wrong.";
+        errEl.classList.remove("hidden");
+        return;
+      }
+      state.user = body.user;
+      e.currentTarget.reset();
+      showApp();
+      state.selectedId = null;
+      await refresh();
+    } finally {
+      submit.disabled = false;
+      submit.textContent = original;
+    }
+  });
+
+  document.getElementById("account-btn").addEventListener("click", (e) => {
+    e.stopPropagation();
+    document.getElementById("account-dropdown").classList.toggle("hidden");
+  });
+  document.addEventListener("click", () => {
+    document.getElementById("account-dropdown")?.classList.add("hidden");
+  });
+
+  document.getElementById("logout-btn").addEventListener("click", async () => {
+    await api.logout();
+    state.user = null;
+    state.tickets = [];
+    state.selectedId = null;
+    showAuth();
+  });
+
+  document.getElementById("open-account").addEventListener("click", async () => {
+    document.getElementById("account-dropdown").classList.add("hidden");
+    await openAccountModal();
+  });
+
+  document.querySelectorAll("[data-close-account]").forEach((el) => {
+    el.addEventListener("click", () => document.getElementById("account-modal").classList.add("hidden"));
+  });
+
+  document.getElementById("acc-name-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const name = new FormData(e.currentTarget).get("name");
+    const { ok, body } = await api.updateName(name);
+    if (ok) {
+      state.user = body.user;
+      showApp();
+      toast("Name updated");
+      await openAccountModal();
+    } else {
+      accMsg(body.error || "Could not update", true);
+    }
+  });
+
+  document.getElementById("acc-pw-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const fd = new FormData(e.currentTarget);
+    const { ok, body } = await api.changePassword({
+      current_password: fd.get("current_password"),
+      new_password: fd.get("new_password"),
+    });
+    if (ok) {
+      e.currentTarget.reset();
+      accMsg("Password updated.", false);
+      toast("Password updated");
+    } else {
+      accMsg(body.error || "Could not update password", true);
+    }
+  });
+}
+
+async function openAccountModal() {
+  if (!state.user) return;
+  const modal = document.getElementById("account-modal");
+  document.getElementById("acc-avatar").textContent = (state.user.name || state.user.email).trim().charAt(0).toUpperCase();
+  document.getElementById("acc-name").textContent = state.user.name;
+  document.getElementById("acc-email").textContent = state.user.email;
+  document.getElementById("acc-since").textContent = state.user.created_at
+    ? `Member since ${new Date(state.user.created_at).toLocaleDateString()}`
+    : "";
+  document.querySelector('#acc-name-form input[name="name"]').value = state.user.name;
+
+  const stats = await api.stats();
+  document.getElementById("acc-stats").innerHTML = [
+    { label: "Total", value: stats.total },
+    { label: "Open", value: stats.open },
+    { label: "Triaged", value: stats.analyzed },
+    { label: "Resolved", value: stats.resolved },
+  ].map((c) => `
+    <div class="rounded-lg bg-slate-50 border border-slate-100 px-3 py-2">
+      <div class="text-[10px] uppercase tracking-wide text-slate-500">${c.label}</div>
+      <div class="text-lg font-semibold tracking-tight">${c.value}</div>
+    </div>`).join("");
+
+  modal.classList.remove("hidden");
+}
+
+function accMsg(text, isError) {
+  const el = document.getElementById("acc-msg");
+  el.textContent = text;
+  el.className = "text-xs " + (isError ? "text-rose-700" : "text-emerald-700");
+  el.classList.remove("hidden");
+}
 
 function bindUi() {
   document.getElementById("new-ticket-btn").addEventListener("click", () => toggleModal(true));
@@ -145,9 +328,14 @@ function bindUi() {
 
 async function refresh() {
   const [tickets, stats] = await Promise.all([api.list(), api.stats()]);
-  state.tickets = tickets;
+  if (tickets && tickets.error === "authentication required") {
+    state.user = null;
+    showAuth();
+    return;
+  }
+  state.tickets = Array.isArray(tickets) ? tickets : [];
   renderStats(stats);
-  renderList(tickets);
+  renderList(state.tickets);
   if (state.selectedId && tickets.find((t) => t.id === state.selectedId)) {
     renderDetail(tickets.find((t) => t.id === state.selectedId));
   } else if (tickets.length) {

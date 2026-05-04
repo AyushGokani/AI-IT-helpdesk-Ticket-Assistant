@@ -37,18 +37,20 @@ class TicketStore:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self.path.write_text(json.dumps(tickets, indent=2), encoding="utf-8")
 
-    def list(self) -> list[dict[str, Any]]:
-        with self._lock:
-            return sorted(
-                self._read(),
-                key=lambda t: t.get("created_at", ""),
-                reverse=True,
-            )
+    def _matches_owner(self, ticket: dict[str, Any], user_id: str | None) -> bool:
+        if user_id is None:
+            return True
+        return ticket.get("user_id") == user_id
 
-    def get(self, ticket_id: str) -> dict[str, Any] | None:
+    def list(self, user_id: str | None = None) -> list[dict[str, Any]]:
+        with self._lock:
+            tickets = [t for t in self._read() if self._matches_owner(t, user_id)]
+        return sorted(tickets, key=lambda t: t.get("created_at", ""), reverse=True)
+
+    def get(self, ticket_id: str, user_id: str | None = None) -> dict[str, Any] | None:
         with self._lock:
             for ticket in self._read():
-                if ticket["id"] == ticket_id:
+                if ticket["id"] == ticket_id and self._matches_owner(ticket, user_id):
                     return ticket
         return None
 
@@ -57,9 +59,11 @@ class TicketStore:
         subject: str,
         body: str,
         requester: str | None = None,
+        user_id: str | None = None,
     ) -> dict[str, Any]:
         ticket = {
             "id": uuid.uuid4().hex[:10],
+            "user_id": user_id,
             "subject": (subject or "").strip() or "(no subject)",
             "body": (body or "").strip(),
             "requester": (requester or "").strip() or "unknown@example.com",
@@ -73,13 +77,18 @@ class TicketStore:
             self._write(tickets)
         return ticket
 
-    def bulk_add(self, rows: Iterable[dict[str, str]]) -> list[dict[str, Any]]:
+    def bulk_add(
+        self,
+        rows: Iterable[dict[str, str]],
+        user_id: str | None = None,
+    ) -> list[dict[str, Any]]:
         created: list[dict[str, Any]] = []
         with self._lock:
             tickets = self._read()
             for row in rows:
                 ticket = {
                     "id": uuid.uuid4().hex[:10],
+                    "user_id": user_id,
                     "subject": (row.get("subject") or "").strip() or "(no subject)",
                     "body": (row.get("body") or row.get("description") or "").strip(),
                     "requester": (row.get("requester") or row.get("email") or "unknown@example.com").strip(),
@@ -92,42 +101,55 @@ class TicketStore:
             self._write(tickets)
         return created
 
-    def update_ai(self, ticket_id: str, ai_payload: dict[str, Any]) -> dict[str, Any] | None:
+    def update_ai(
+        self, ticket_id: str, ai_payload: dict[str, Any], user_id: str | None = None
+    ) -> dict[str, Any] | None:
         with self._lock:
             tickets = self._read()
             for ticket in tickets:
-                if ticket["id"] == ticket_id:
+                if ticket["id"] == ticket_id and self._matches_owner(ticket, user_id):
                     ticket["ai"] = ai_payload
                     ticket["analyzed_at"] = _now_iso()
                     self._write(tickets)
                     return ticket
         return None
 
-    def update_status(self, ticket_id: str, status: str) -> dict[str, Any] | None:
+    def update_status(
+        self, ticket_id: str, status: str, user_id: str | None = None
+    ) -> dict[str, Any] | None:
         with self._lock:
             tickets = self._read()
             for ticket in tickets:
-                if ticket["id"] == ticket_id:
+                if ticket["id"] == ticket_id and self._matches_owner(ticket, user_id):
                     ticket["status"] = status
                     self._write(tickets)
                     return ticket
         return None
 
-    def delete(self, ticket_id: str) -> bool:
+    def delete(self, ticket_id: str, user_id: str | None = None) -> bool:
         with self._lock:
             tickets = self._read()
-            new_tickets = [t for t in tickets if t["id"] != ticket_id]
-            if len(new_tickets) == len(tickets):
+            target = None
+            for ticket in tickets:
+                if ticket["id"] == ticket_id and self._matches_owner(ticket, user_id):
+                    target = ticket
+                    break
+            if target is None:
                 return False
-            self._write(new_tickets)
+            tickets.remove(target)
+            self._write(tickets)
             return True
 
-    def clear(self) -> None:
+    def clear(self, user_id: str | None = None) -> None:
         with self._lock:
-            self._write([])
+            tickets = self._read()
+            if user_id is None:
+                self._write([])
+            else:
+                self._write([t for t in tickets if t.get("user_id") != user_id])
 
-    def stats(self) -> dict[str, Any]:
-        tickets = self.list()
+    def stats(self, user_id: str | None = None) -> dict[str, Any]:
+        tickets = self.list(user_id)
         by_category: dict[str, int] = {}
         by_priority: dict[str, int] = {}
         analyzed = 0
