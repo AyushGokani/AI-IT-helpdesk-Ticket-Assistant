@@ -77,8 +77,16 @@ DEMO_TICKETS = [
 
 
 def maybe_seed(store: TicketStore) -> int:
-    """Seed demo tickets if the store is empty. Returns count inserted."""
+    """Seed demo tickets globally if the store is empty (no auth mode)."""
     if store.list():
         return 0
     created = store.bulk_add(DEMO_TICKETS)
+    return len(created)
+
+
+def seed_for_user(store: TicketStore, user_id: str) -> int:
+    """Seed demo tickets for one user if they have none."""
+    if store.list(user_id):
+        return 0
+    created = store.bulk_add(DEMO_TICKETS, user_id=user_id)
     return len(created)
