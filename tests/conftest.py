@@ -8,19 +8,19 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from app import create_app  # noqa: E402
-from app.storage import TicketStore  # noqa: E402
-from app.users import UserStore  # noqa: E402
 
 
 @pytest.fixture()
 def app(tmp_path):
+    # File-backed SQLite per test for clean isolation; in-memory would require
+    # a shared connection trick across threads/sessions which isn't worth it.
+    db_path = tmp_path / "test.sqlite3"
     app = create_app({
         "TESTING": True,
         "DATA_DIR": tmp_path,
         "OPENAI_API_KEY": "",
+        "DATABASE_URL": f"sqlite:///{db_path}",
     })
-    app.extensions["ticket_store"] = TicketStore(tmp_path / "tickets.json")
-    app.extensions["user_store"] = UserStore(tmp_path / "users.json")
     return app
 
 
@@ -32,10 +32,7 @@ def anon_client(app):
 
 @pytest.fixture()
 def client(app):
-    """A client pre-authenticated as alice@example.com.
-
-    All ticket/route tests use this so they don't need to handle auth boilerplate.
-    """
+    """A client pre-authenticated as alice@example.com."""
     c = app.test_client()
     res = c.post("/api/auth/signup", json={
         "email": "alice@example.com",

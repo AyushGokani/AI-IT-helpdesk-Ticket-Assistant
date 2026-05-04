@@ -1,14 +1,16 @@
 # Render Blueprint for one-click deploy.
-# Use the "Deploy to Render" button in the README, or push to a connected repo
-# and Render will auto-detect this file.
 #
 # Free tier notes:
-#   - Spins down after 15 minutes of inactivity (~30s cold start on next visit).
-#   - File system is ephemeral: ticket data resets on every redeploy / restart.
-#     For a portfolio demo this is fine — SEED_DEMO_DATA=1 re-populates the
-#     queue with 8 example tickets on every cold boot.
-#   - To make data permanent, upgrade to a paid plan and re-add a `disk:` block
-#     mounted at /var/data, plus set DATA_DIR=/var/data.
+#   - Web service spins down after 15 minutes of inactivity (~30s cold start).
+#   - Free Postgres database is provisioned alongside the web service so user
+#     accounts and tickets survive restarts and redeploys.
+#   - DATABASE_URL is auto-injected from the database into the web service.
+databases:
+  - name: triagent-db
+    plan: free
+    databaseName: triagent
+    user: triagent
+
 services:
   - type: web
     name: triagent
@@ -34,3 +36,7 @@ services:
         value: "1"
       - key: SESSION_COOKIE_SECURE
         value: "1"
+      - key: DATABASE_URL
+        fromDatabase:
+          name: triagent-db
+          property: connectionString
