@@ -1,8 +1,8 @@
 import io
 
 
-def test_health(client):
-    res = client.get("/api/health")
+def test_health_is_public(anon_client):
+    res = anon_client.get("/api/health")
     assert res.status_code == 200
     body = res.get_json()
     assert body["ok"] is True
@@ -129,14 +129,16 @@ def test_clear(client):
     assert client.get("/api/tickets").get_json() == []
 
 
-def test_seed_endpoint_only_populates_when_empty(client):
+def test_seed_endpoint_only_populates_when_user_is_empty(client):
+    # Wipe alice's slate (signup may have seeded if SEED_DEMO_DATA was on)
+    client.post("/api/tickets/clear")
     res = client.post("/api/tickets/seed")
     body = res.get_json()
     assert body["ok"] is True
     assert body["inserted"] >= 1
     first = body["inserted"]
 
-    # Second call should be a no-op since the store is no longer empty
+    # Second call is a no-op since the user already has tickets
     res = client.post("/api/tickets/seed")
     assert res.get_json()["inserted"] == 0
 
