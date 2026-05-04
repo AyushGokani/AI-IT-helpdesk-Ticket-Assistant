@@ -69,18 +69,32 @@ const state = {
 document.addEventListener("DOMContentLoaded", async () => {
   bindAuthUi();
   bindUi();
-  const health = await api.health();
-  state.aiConfigured = !!health.ai_configured;
-  renderAiBadge(health);
 
-  const me = await api.me();
-  if (me.user) {
-    state.user = me.user;
-    showApp();
-    await refresh();
-  } else {
-    showAuth();
+  // Tiny "warming up" toast on slow first paint (Render free-tier cold start).
+  const wakeToast = setTimeout(() => {
+    toast("Waking up the free-tier server… this takes ~30s on first visit", false);
+  }, 3000);
+
+  try {
+    const health = await api.health();
+    state.aiConfigured = !!health.ai_configured;
+    renderAiBadge(health);
+
+    const me = await api.me();
+    if (me.user) {
+      state.user = me.user;
+      showApp();
+      await refresh();
+    } else {
+      showAuth();
+    }
+  } finally {
+    clearTimeout(wakeToast);
   }
+
+  // Cheap keep-alive: ping /api/health every 10 minutes so Render doesn't
+  // spin the service down while the tab is open. (15-min idle timeout.)
+  setInterval(() => { fetch("/api/health", { cache: "no-store" }).catch(() => {}); }, 10 * 60 * 1000);
 });
 
 // ---------------------------------------------------------------------------
@@ -138,11 +152,20 @@ function bindAuthUi() {
     const payload = Object.fromEntries(fd.entries());
     submit.disabled = true;
     const original = submit.textContent;
-    submit.textContent = state.authMode === "signup" ? "Creating account…" : "Signing in…";
+    const verb = state.authMode === "signup" ? "Creating account" : "Signing in";
+    submit.textContent = `${verb}…`;
     errEl.classList.add("hidden");
+
+    // After ~5s, hint that this is probably a Render free-tier cold start
+    // so the user doesn't think the app is broken.
+    const slowHint = setTimeout(() => {
+      submit.textContent = `${verb}… waking server (~30s)`;
+    }, 5000);
+
     try {
       const fn = state.authMode === "signup" ? api.signup : api.login;
       const { ok, body } = await fn(payload);
+      clearTimeout(slowHint);
       if (!ok) {
         errEl.textContent = body.error || "Something went wrong.";
         errEl.classList.remove("hidden");
@@ -153,7 +176,26 @@ function bindAuthUi() {
       showApp();
       state.selectedId = null;
       await refresh();
+    } catch (err) {
+      clearTimeout(slowHint);
+      // Network / timeout — the request might still have succeeded server-side
+      // (which is exactly what bit users on Render cold starts). Re-check /me
+      // before showing an error so we recover gracefully.
+      try {
+        const me = await api.me();
+        if (me.user) {
+          state.user = me.user;
+          e.currentTarget.reset();
+          showApp();
+          state.selectedId = null;
+          await refresh();
+          return;
+        }
+      } catch (_) { /* fall through */ }
+      errEl.textContent = "Network error — please try again in a moment.";
+      errEl.classList.remove("hidden");
     } finally {
+      clearTimeout(slowHint);
       submit.disabled = false;
       submit.textContent = original;
     }
