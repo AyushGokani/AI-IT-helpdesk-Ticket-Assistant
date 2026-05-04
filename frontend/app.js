@@ -162,36 +162,45 @@ function bindAuthUi() {
       submit.textContent = `${verb}… waking server (~30s)`;
     }, 5000);
 
+    const enterApp = async (user) => {
+      state.user = user;
+      try { e.currentTarget.reset(); } catch (_) {}
+      showApp();
+      state.selectedId = null;
+      // Tiny breath so the browser definitely commits the Set-Cookie from the
+      // login response before we fire authenticated requests. Avoids a race
+      // where /api/tickets returns 401 because the cookie isn't set yet.
+      await new Promise((r) => setTimeout(r, 150));
+      try { await refresh(); } catch (err) { console.error("refresh failed", err); }
+    };
+
     try {
       const fn = state.authMode === "signup" ? api.signup : api.login;
-      const { ok, body } = await fn(payload);
+      let result;
+      try {
+        result = await fn(payload);
+      } catch (netErr) {
+        // Network / timeout. The POST may still have succeeded server-side
+        // (common on Render cold starts). Re-check /me before giving up.
+        console.warn("auth fetch threw", netErr);
+        const me = await api.me().catch(() => ({ user: null }));
+        if (me && me.user) { await enterApp(me.user); return; }
+        throw netErr;
+      }
       clearTimeout(slowHint);
-      if (!ok) {
-        errEl.textContent = body.error || "Something went wrong.";
+      if (!result.ok) {
+        errEl.textContent = result.body?.error || "Something went wrong.";
         errEl.classList.remove("hidden");
         return;
       }
-      state.user = body.user;
-      e.currentTarget.reset();
-      showApp();
-      state.selectedId = null;
-      await refresh();
+      await enterApp(result.body.user);
     } catch (err) {
-      clearTimeout(slowHint);
-      // Network / timeout — the request might still have succeeded server-side
-      // (which is exactly what bit users on Render cold starts). Re-check /me
-      // before showing an error so we recover gracefully.
-      try {
-        const me = await api.me();
-        if (me.user) {
-          state.user = me.user;
-          e.currentTarget.reset();
-          showApp();
-          state.selectedId = null;
-          await refresh();
-          return;
-        }
-      } catch (_) { /* fall through */ }
+      console.error("auth flow failed", err);
+      // Last-ditch: maybe the cookie IS set even though something downstream
+      // threw. Re-check /me one more time so the user isn't stranded on the
+      // auth screen when they're actually logged in.
+      const me = await api.me().catch(() => ({ user: null }));
+      if (me && me.user) { await enterApp(me.user); return; }
       errEl.textContent = "Network error — please try again in a moment.";
       errEl.classList.remove("hidden");
     } finally {
@@ -369,12 +378,30 @@ function bindUi() {
 // ---------------------------------------------------------------------------
 
 async function refresh() {
-  const [tickets, stats] = await Promise.all([api.list(), api.stats()]);
+  let [tickets, stats] = await Promise.all([api.list(), api.stats()]);
+
+  // Cookie race: right after login the browser sometimes hasn't finished
+  // committing the Set-Cookie before the next request fires, so the very
+  // first /api/tickets call comes back 401. Retry once after a short wait
+  // before assuming the session is actually invalid.
   if (tickets && tickets.error === "authentication required") {
-    state.user = null;
-    showAuth();
-    return;
+    await new Promise((r) => setTimeout(r, 250));
+    [tickets, stats] = await Promise.all([api.list(), api.stats()]);
   }
+
+  if (tickets && tickets.error === "authentication required") {
+    // Definitively not authenticated — but only show the login screen if
+    // /me agrees. Otherwise we just had a transient blip; stay where we are.
+    const me = await api.me().catch(() => ({ user: null }));
+    if (!me.user) {
+      state.user = null;
+      showAuth();
+      return;
+    }
+    // Session is actually valid — try one more time before giving up.
+    [tickets, stats] = await Promise.all([api.list(), api.stats()]);
+  }
+
   state.tickets = Array.isArray(tickets) ? tickets : [];
   renderStats(stats);
   renderList(state.tickets);
