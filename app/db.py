@@ -18,6 +18,7 @@ from sqlalchemy import (
     Boolean,
     DateTime,
     ForeignKey,
+    Integer,
     String,
     Text,
     create_engine,
@@ -68,6 +69,29 @@ class User(Base):
     tickets: Mapped[list["Ticket"]] = relationship(
         "Ticket", back_populates="user", cascade="all, delete-orphan"
     )
+
+
+class PasswordResetCode(Base):
+    """Short-lived 6-digit OTP for the forgot-password flow.
+
+    We store a hash of the code (not the code itself) so a database
+    leak doesn't enable account takeover. The plaintext is only ever
+    in memory long enough to email it to the user.
+    """
+
+    __tablename__ = "password_reset_codes"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    user_id: Mapped[str] = mapped_column(
+        String(32), ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False
+    )
+    code_hash: Mapped[str] = mapped_column(String(255), nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    used_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    attempts: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
+
+    user: Mapped["User"] = relationship("User")
 
 
 class Ticket(Base):

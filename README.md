@@ -242,19 +242,50 @@ a ticket exists.
 When `SEED_DEMO_DATA=1`, each new signup is auto-populated with 8 demo tickets
 so the first login isn't an empty inbox.
 
+### Forgot password / reset by email
+
+`Forgot password?` link on the sign-in screen kicks off a 3-step flow:
+
+1. User enters their email → backend issues a **6-digit code**, hashes it,
+   stores it with a 15-minute TTL, and emails the plaintext to the user.
+2. User enters the code → server validates without consuming it.
+3. User picks a new password → server verifies the code one last time,
+   updates the password hash, marks the code used, and signs the user in.
+
+Codes are **single-use**, **expire in 15 minutes**, and **lock after 5 wrong
+attempts**. Issuing a new code invalidates any earlier unused one. The
+`/forgot-password` endpoint always returns a generic success message so it
+can't be used to enumerate which emails have accounts.
+
+#### Email backends
+
+The email sender picks the first configured backend automatically:
+
+| Backend         | Set these env vars                                                  | Notes                              |
+| --------------- | ------------------------------------------------------------------- | ---------------------------------- |
+| **Gmail SMTP**  | `SMTP_HOST=smtp.gmail.com` `SMTP_PORT=587` `SMTP_USER` `SMTP_PASSWORD` | Use a [Gmail App Password](https://myaccount.google.com/apppasswords), not your account password |
+| **Resend**      | `RESEND_API_KEY=re_...`                                             | Free 100 emails/day, sign up with GitHub at resend.com |
+| **Console**     | (none)                                                              | Fallback — prints the email to stdout. Visible in `python wsgi.py` terminal locally, or in Render logs in production. |
+
+For the live demo the console fallback is fine — show the demo, point at
+"check Render logs to see the code", and that's a real working flow.
+
 ## API
 
 ### Auth (no auth required)
 
-| Method | Path                       | What it does                                   |
-| ------ | -------------------------- | ---------------------------------------------- |
-| POST   | `/api/auth/signup`         | `{email, password, name?}` → creates user, logs in, seeds demo data |
-| POST   | `/api/auth/login`          | `{email, password}`                            |
-| POST   | `/api/auth/logout`         | Clears the session                             |
-| GET    | `/api/auth/me`             | `{user}` or `{user: null}`                     |
-| PATCH  | `/api/auth/me`             | `{name}` (login required)                      |
-| POST   | `/api/auth/change-password`| `{current_password, new_password}` (login required) |
-| GET    | `/api/health`              | Public — reports whether an API key is configured |
+| Method | Path                          | What it does                                                            |
+| ------ | ----------------------------- | ----------------------------------------------------------------------- |
+| POST   | `/api/auth/signup`            | `{email, password, name?}` → creates user, logs in, seeds demo data     |
+| POST   | `/api/auth/login`             | `{email, password}`                                                     |
+| POST   | `/api/auth/logout`            | Clears the session                                                      |
+| GET    | `/api/auth/me`                | `{user}` or `{user: null}`                                              |
+| PATCH  | `/api/auth/me`                | `{name}` (login required)                                               |
+| POST   | `/api/auth/change-password`   | `{current_password, new_password}` (login required)                     |
+| POST   | `/api/auth/forgot-password`   | `{email}` → emails a 6-digit reset code (always returns generic 200)    |
+| POST   | `/api/auth/verify-reset-code` | `{email, code}` → validates the code without consuming it               |
+| POST   | `/api/auth/reset-password`    | `{email, code, new_password}` → sets new password and auto-logs you in  |
+| GET    | `/api/health`                 | Public — reports whether an API key is configured                       |
 
 ### Tickets (login required, scoped to current user)
 
@@ -282,10 +313,12 @@ CSV columns (case-insensitive, common synonyms accepted):
 pytest -q
 ```
 
-27 tests cover signup/login/logout, password hashing & changes, per-user data
-isolation (Alice can't see Bob's tickets), the heuristic classifier, the OpenAI
-fallback path (monkey-patched), every JSON endpoint, the no-cache headers, and
-the seed-once-only behavior. Whole suite runs in under two seconds.
+36 tests cover signup/login/logout, password hashing & changes, per-user data
+isolation (Alice can't see Bob's tickets), the **full forgot-password flow**
+(code generation, single-use semantics, expiry, max-attempts lockout, code
+rotation), the heuristic classifier, the OpenAI fallback path (monkey-patched),
+every JSON endpoint, the no-cache headers, and the seed-once-only behavior.
+Whole suite runs in under five seconds.
 
 ---
 

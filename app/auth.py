@@ -6,6 +6,7 @@ from functools import wraps
 
 from flask import Blueprint, current_app, g, jsonify, request, session
 
+from .email_service import send_password_reset_code
 from .users import AuthError, UserStore
 
 
@@ -125,3 +126,66 @@ def change_password():
     except AuthError as exc:
         return {"error": str(exc)}, 400
     return {"ok": True}
+
+
+# ---------------------------------------------------------------------------
+# Forgot-password flow
+#
+# Three steps from the client's POV:
+#   1. POST /forgot-password           {email}            → send code by email
+#   2. POST /verify-reset-code         {email, code}      → validate code (does not consume)
+#   3. POST /reset-password            {email, code,
+#                                       new_password}     → set new password
+#
+# We always return a generic success response from /forgot-password so the
+# endpoint can't be used to enumerate which emails have accounts.
+# ---------------------------------------------------------------------------
+
+_FORGOT_RESPONSE = {
+    "ok": True,
+    "message": "If an account exists for that email, a 6-digit code has been sent.",
+}
+
+
+@bp.post("/forgot-password")
+def forgot_password():
+    payload = request.get_json(silent=True) or {}
+    email = payload.get("email", "")
+    issued = _users().issue_reset_code(email)
+    if issued is not None:
+        user, code = issued
+        try:
+            send_password_reset_code(to=user["email"], name=user["name"], code=code)
+        except Exception:  # noqa: BLE001
+            current_app.logger.exception("password reset email failed for %s", email)
+            # Don't leak the failure to the client — they shouldn't know
+            # whether the email step succeeded.
+    return _FORGOT_RESPONSE
+
+
+@bp.post("/verify-reset-code")
+def verify_reset_code():
+    payload = request.get_json(silent=True) or {}
+    try:
+        _users().verify_reset_code(payload.get("email", ""), payload.get("code", ""))
+    except AuthError as exc:
+        return {"error": str(exc)}, 400
+    return {"ok": True}
+
+
+@bp.post("/reset-password")
+def reset_password():
+    payload = request.get_json(silent=True) or {}
+    try:
+        user = _users().consume_reset_code(
+            payload.get("email", ""),
+            payload.get("code", ""),
+            payload.get("new_password", ""),
+        )
+    except AuthError as exc:
+        return {"error": str(exc)}, 400
+    # Auto-login on success
+    session.clear()
+    session[SESSION_USER_KEY] = user["id"]
+    session.permanent = True
+    return jsonify({"user": user})

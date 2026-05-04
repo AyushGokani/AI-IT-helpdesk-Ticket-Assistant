@@ -40,3 +40,18 @@ services:
         fromDatabase:
           name: triagent-db
           property: connectionString
+      # ----- Email (password reset codes) -----
+      # Set ONE backend in the Render dashboard. If none are set, codes are
+      # printed to the service logs (sufficient for a demo).
+      - key: SMTP_HOST
+        sync: false   # e.g. smtp.gmail.com
+      - key: SMTP_PORT
+        sync: false   # e.g. 587
+      - key: SMTP_USER
+        sync: false   # e.g. you@gmail.com
+      - key: SMTP_PASSWORD
+        sync: false   # Gmail App Password (16 chars), NOT your account password
+      - key: EMAIL_FROM
+        sync: false
+      - key: RESEND_API_KEY
+        sync: false
