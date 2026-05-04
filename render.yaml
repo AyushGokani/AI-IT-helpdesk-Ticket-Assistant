@@ -32,3 +32,5 @@ services:
         value: gpt-4o-mini
       - key: SEED_DEMO_DATA
         value: "1"
+      - key: SESSION_COOKIE_SECURE
+        value: "1"

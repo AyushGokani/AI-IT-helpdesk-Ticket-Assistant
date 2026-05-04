@@ -228,20 +228,46 @@ upload, status, and delete endpoints never touch the API.
 
 ---
 
+## Auth & per-user data
+
+Every visitor needs a free account before they can use Triagent. Sessions use
+Flask's signed cookies (`HttpOnly`, `SameSite=Lax`, plus `Secure` in production
+when `SESSION_COOKIE_SECURE=1`). Passwords are hashed with PBKDF2 via Werkzeug.
+
+Tickets are scoped per user — Alice never sees Bob's queue, and the API
+returns `404` (not `403`) on cross-account access so it doesn't even leak that
+a ticket exists.
+
+When `SEED_DEMO_DATA=1`, each new signup is auto-populated with 8 demo tickets
+so the first login isn't an empty inbox.
+
 ## API
+
+### Auth (no auth required)
+
+| Method | Path                       | What it does                                   |
+| ------ | -------------------------- | ---------------------------------------------- |
+| POST   | `/api/auth/signup`         | `{email, password, name?}` → creates user, logs in, seeds demo data |
+| POST   | `/api/auth/login`          | `{email, password}`                            |
+| POST   | `/api/auth/logout`         | Clears the session                             |
+| GET    | `/api/auth/me`             | `{user}` or `{user: null}`                     |
+| PATCH  | `/api/auth/me`             | `{name}` (login required)                      |
+| POST   | `/api/auth/change-password`| `{current_password, new_password}` (login required) |
+| GET    | `/api/health`              | Public — reports whether an API key is configured |
+
+### Tickets (login required, scoped to current user)
 
 | Method | Path                              | What it does                                   |
 | ------ | --------------------------------- | ---------------------------------------------- |
-| GET    | `/api/health`                     | Health + whether an API key is configured      |
-| GET    | `/api/tickets`                    | List tickets (newest first)                    |
-| POST   | `/api/tickets`                    | Create a ticket `{subject, body, requester}`   |
+| GET    | `/api/tickets`                    | List your tickets (newest first)               |
+| POST   | `/api/tickets`                    | Create a ticket `{subject, body, requester?}`  |
 | GET    | `/api/tickets/<id>`               | Get one ticket                                 |
 | POST   | `/api/tickets/<id>/analyze`       | **Run AI triage** (`{"offline": true}` to force heuristic) |
 | POST   | `/api/tickets/<id>/status`        | Update status `{open, in_progress, resolved}`  |
 | DELETE | `/api/tickets/<id>`               | Delete                                         |
 | POST   | `/api/tickets/upload`             | Bulk upload CSV (multipart `file`)             |
-| POST   | `/api/tickets/clear`              | Wipe all tickets                               |
-| POST   | `/api/tickets/seed`               | Insert demo tickets (only if store is empty)   |
+| POST   | `/api/tickets/clear`              | Wipe your tickets                              |
+| POST   | `/api/tickets/seed`               | Insert demo tickets (only if your queue is empty) |
 | GET    | `/api/stats`                      | Counts by status, category, priority           |
 
 CSV columns (case-insensitive, common synonyms accepted):
@@ -255,9 +281,10 @@ CSV columns (case-insensitive, common synonyms accepted):
 pytest -q
 ```
 
-17 tests cover the heuristic classifier, the OpenAI fallback path
-(monkey-patched), every JSON endpoint, the no-cache headers, and the
-seed-once-only behavior. Whole suite runs in under a second.
+27 tests cover signup/login/logout, password hashing & changes, per-user data
+isolation (Alice can't see Bob's tickets), the heuristic classifier, the OpenAI
+fallback path (monkey-patched), every JSON endpoint, the no-cache headers, and
+the seed-once-only behavior. Whole suite runs in under two seconds.
 
 ---
 
