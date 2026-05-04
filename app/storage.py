@@ -1,152 +1,61 @@
-"""Lightweight JSON-backed ticket store.
-
-Avoids a database dependency so the app runs anywhere with zero setup.
-Thread-safe enough for a demo via a per-instance lock.
-"""
+"""SQLAlchemy-backed ticket store. CSV parser stays as a free function."""
 
 from __future__ import annotations
 
 import csv
 import io
-import json
-import threading
 import uuid
-from datetime import datetime, timezone
-from pathlib import Path
 from typing import Any, Iterable
 
+from sqlalchemy import select
 
-def _now_iso() -> str:
-    return datetime.now(timezone.utc).isoformat(timespec="seconds")
+from .db import Ticket
+
+
+def _serialize(ticket: Ticket) -> dict[str, Any]:
+    out: dict[str, Any] = {
+        "id": ticket.id,
+        "user_id": ticket.user_id,
+        "subject": ticket.subject,
+        "body": ticket.body,
+        "requester": ticket.requester,
+        "status": ticket.status,
+        "created_at": ticket.created_at.isoformat(timespec="seconds") + "+00:00",
+        "ai": ticket.ai,
+    }
+    if ticket.analyzed_at is not None:
+        out["analyzed_at"] = ticket.analyzed_at.isoformat(timespec="seconds") + "+00:00"
+    return out
+
+
+def _new_id() -> str:
+    return uuid.uuid4().hex[:10]
 
 
 class TicketStore:
-    def __init__(self, path: Path):
-        self.path = Path(path)
-        self._lock = threading.Lock()
-        if not self.path.exists():
-            self._write([])
+    def __init__(self, session_factory):
+        self._SessionFactory = session_factory
 
-    def _read(self) -> list[dict[str, Any]]:
-        try:
-            return json.loads(self.path.read_text(encoding="utf-8"))
-        except (FileNotFoundError, json.JSONDecodeError):
-            return []
-
-    def _write(self, tickets: list[dict[str, Any]]) -> None:
-        self.path.parent.mkdir(parents=True, exist_ok=True)
-        self.path.write_text(json.dumps(tickets, indent=2), encoding="utf-8")
-
-    def _matches_owner(self, ticket: dict[str, Any], user_id: str | None) -> bool:
+    def _ownership_filter(self, query, user_id: str | None):
         if user_id is None:
-            return True
-        return ticket.get("user_id") == user_id
+            return query
+        return query.where(Ticket.user_id == user_id)
+
+    # ------------------------------------------------------------------ READ
 
     def list(self, user_id: str | None = None) -> list[dict[str, Any]]:
-        with self._lock:
-            tickets = [t for t in self._read() if self._matches_owner(t, user_id)]
-        return sorted(tickets, key=lambda t: t.get("created_at", ""), reverse=True)
+        with self._SessionFactory() as session:
+            stmt = self._ownership_filter(select(Ticket), user_id).order_by(Ticket.created_at.desc())
+            return [_serialize(t) for t in session.execute(stmt).scalars().all()]
 
     def get(self, ticket_id: str, user_id: str | None = None) -> dict[str, Any] | None:
-        with self._lock:
-            for ticket in self._read():
-                if ticket["id"] == ticket_id and self._matches_owner(ticket, user_id):
-                    return ticket
-        return None
-
-    def add(
-        self,
-        subject: str,
-        body: str,
-        requester: str | None = None,
-        user_id: str | None = None,
-    ) -> dict[str, Any]:
-        ticket = {
-            "id": uuid.uuid4().hex[:10],
-            "user_id": user_id,
-            "subject": (subject or "").strip() or "(no subject)",
-            "body": (body or "").strip(),
-            "requester": (requester or "").strip() or "unknown@example.com",
-            "status": "open",
-            "created_at": _now_iso(),
-            "ai": None,
-        }
-        with self._lock:
-            tickets = self._read()
-            tickets.append(ticket)
-            self._write(tickets)
-        return ticket
-
-    def bulk_add(
-        self,
-        rows: Iterable[dict[str, str]],
-        user_id: str | None = None,
-    ) -> list[dict[str, Any]]:
-        created: list[dict[str, Any]] = []
-        with self._lock:
-            tickets = self._read()
-            for row in rows:
-                ticket = {
-                    "id": uuid.uuid4().hex[:10],
-                    "user_id": user_id,
-                    "subject": (row.get("subject") or "").strip() or "(no subject)",
-                    "body": (row.get("body") or row.get("description") or "").strip(),
-                    "requester": (row.get("requester") or row.get("email") or "unknown@example.com").strip(),
-                    "status": "open",
-                    "created_at": _now_iso(),
-                    "ai": None,
-                }
-                tickets.append(ticket)
-                created.append(ticket)
-            self._write(tickets)
-        return created
-
-    def update_ai(
-        self, ticket_id: str, ai_payload: dict[str, Any], user_id: str | None = None
-    ) -> dict[str, Any] | None:
-        with self._lock:
-            tickets = self._read()
-            for ticket in tickets:
-                if ticket["id"] == ticket_id and self._matches_owner(ticket, user_id):
-                    ticket["ai"] = ai_payload
-                    ticket["analyzed_at"] = _now_iso()
-                    self._write(tickets)
-                    return ticket
-        return None
-
-    def update_status(
-        self, ticket_id: str, status: str, user_id: str | None = None
-    ) -> dict[str, Any] | None:
-        with self._lock:
-            tickets = self._read()
-            for ticket in tickets:
-                if ticket["id"] == ticket_id and self._matches_owner(ticket, user_id):
-                    ticket["status"] = status
-                    self._write(tickets)
-                    return ticket
-        return None
-
-    def delete(self, ticket_id: str, user_id: str | None = None) -> bool:
-        with self._lock:
-            tickets = self._read()
-            target = None
-            for ticket in tickets:
-                if ticket["id"] == ticket_id and self._matches_owner(ticket, user_id):
-                    target = ticket
-                    break
-            if target is None:
-                return False
-            tickets.remove(target)
-            self._write(tickets)
-            return True
-
-    def clear(self, user_id: str | None = None) -> None:
-        with self._lock:
-            tickets = self._read()
-            if user_id is None:
-                self._write([])
-            else:
-                self._write([t for t in tickets if t.get("user_id") != user_id])
+        with self._SessionFactory() as session:
+            ticket = session.get(Ticket, ticket_id)
+            if ticket is None:
+                return None
+            if user_id is not None and ticket.user_id != user_id:
+                return None
+            return _serialize(ticket)
 
     def stats(self, user_id: str | None = None) -> dict[str, Any]:
         tickets = self.list(user_id)
@@ -170,6 +79,106 @@ class TicketStore:
             "by_priority": by_priority,
         }
 
+    # ----------------------------------------------------------------- WRITE
+
+    def add(
+        self,
+        subject: str,
+        body: str,
+        requester: str | None = None,
+        user_id: str | None = None,
+    ) -> dict[str, Any]:
+        with self._SessionFactory() as session:
+            ticket = Ticket(
+                id=_new_id(),
+                user_id=user_id,
+                subject=(subject or "").strip() or "(no subject)",
+                body=(body or "").strip(),
+                requester=(requester or "").strip() or "unknown@example.com",
+                status="open",
+            )
+            session.add(ticket)
+            session.commit()
+            session.refresh(ticket)
+            return _serialize(ticket)
+
+    def bulk_add(
+        self,
+        rows: Iterable[dict[str, str]],
+        user_id: str | None = None,
+    ) -> list[dict[str, Any]]:
+        created: list[dict[str, Any]] = []
+        with self._SessionFactory() as session:
+            for row in rows:
+                ticket = Ticket(
+                    id=_new_id(),
+                    user_id=user_id,
+                    subject=(row.get("subject") or "").strip() or "(no subject)",
+                    body=(row.get("body") or row.get("description") or "").strip(),
+                    requester=(row.get("requester") or row.get("email") or "unknown@example.com").strip(),
+                    status="open",
+                )
+                session.add(ticket)
+                created.append(ticket)
+            session.commit()
+            for t in created:
+                session.refresh(t)
+            return [_serialize(t) for t in created]
+
+    def update_ai(
+        self,
+        ticket_id: str,
+        ai_payload: dict[str, Any],
+        user_id: str | None = None,
+    ) -> dict[str, Any] | None:
+        with self._SessionFactory() as session:
+            ticket = session.get(Ticket, ticket_id)
+            if ticket is None or (user_id is not None and ticket.user_id != user_id):
+                return None
+            ticket.ai = ai_payload
+            from .db import utcnow
+            ticket.analyzed_at = utcnow()
+            session.commit()
+            session.refresh(ticket)
+            return _serialize(ticket)
+
+    def update_status(
+        self,
+        ticket_id: str,
+        status: str,
+        user_id: str | None = None,
+    ) -> dict[str, Any] | None:
+        with self._SessionFactory() as session:
+            ticket = session.get(Ticket, ticket_id)
+            if ticket is None or (user_id is not None and ticket.user_id != user_id):
+                return None
+            ticket.status = status
+            session.commit()
+            session.refresh(ticket)
+            return _serialize(ticket)
+
+    def delete(self, ticket_id: str, user_id: str | None = None) -> bool:
+        with self._SessionFactory() as session:
+            ticket = session.get(Ticket, ticket_id)
+            if ticket is None or (user_id is not None and ticket.user_id != user_id):
+                return False
+            session.delete(ticket)
+            session.commit()
+            return True
+
+    def clear(self, user_id: str | None = None) -> None:
+        with self._SessionFactory() as session:
+            stmt = select(Ticket)
+            if user_id is not None:
+                stmt = stmt.where(Ticket.user_id == user_id)
+            for t in session.execute(stmt).scalars().all():
+                session.delete(t)
+            session.commit()
+
+
+# ---------------------------------------------------------------------------
+# CSV (unchanged from the JSON era)
+# ---------------------------------------------------------------------------
 
 def parse_csv(file_bytes: bytes) -> list[dict[str, str]]:
     """Parse an uploaded CSV. Expects headers; tolerates common synonyms."""

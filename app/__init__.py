@@ -9,6 +9,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 from flask import Flask
 
+from .db import make_engine, make_session_factory, resolve_database_url
 from .storage import TicketStore
 from .users import UserStore
 
@@ -38,8 +39,18 @@ def create_app(test_config: dict | None = None) -> Flask:
 
     app.config["DATA_DIR"].mkdir(parents=True, exist_ok=True)
 
-    app.extensions["ticket_store"] = TicketStore(app.config["DATA_DIR"] / "tickets.json")
-    app.extensions["user_store"] = UserStore(app.config["DATA_DIR"] / "users.json")
+    database_url = test_config.get("DATABASE_URL") if test_config else None
+    if not database_url:
+        database_url = resolve_database_url(app.config["DATA_DIR"])
+    app.config["DATABASE_URL"] = database_url
+
+    engine = make_engine(database_url)
+    session_factory = make_session_factory(engine)
+    app.extensions["db_engine"] = engine
+    app.extensions["db_session_factory"] = session_factory
+
+    app.extensions["ticket_store"] = TicketStore(session_factory)
+    app.extensions["user_store"] = UserStore(session_factory)
 
     from .auth import bp as auth_bp
     from .routes import bp as api_bp
