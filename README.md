@@ -34,11 +34,11 @@ For each ticket Triagent will:
 
 ## Stack
 
-- **Backend:** Python 3.12 · Flask 3 · OpenAI SDK · gunicorn (production)
-- **Storage:** JSON file (zero-config; persistent disk on Render)
+- **Backend:** Python 3.12 · Flask 3 · SQLAlchemy 2 · OpenAI SDK · gunicorn
+- **Storage:** **Postgres in production**, SQLite locally (zero-config; just `python wsgi.py`)
 - **Frontend:** single-page HTML + Tailwind (CDN) + vanilla JS — no build step
-- **Tests:** 17 pytest tests, all run in <1s
-- **Deploy:** one-click to Render (free tier) via `render.yaml`
+- **Tests:** 27 pytest tests against an in-test SQLite, all run in <2s
+- **Deploy:** one-click to Render (free tier) — `render.yaml` provisions both the web service AND a free Postgres database
 
 ```
 .
@@ -125,9 +125,10 @@ That's it — Triagent is online with HTTPS, auto-deploys on every push to `main
 
 ### Free tier tradeoffs (totally fine for a portfolio demo)
 
-- The service spins down after 15 minutes of inactivity → ~30s cold start on next visit.
-- 1 GB of persistent disk for ticket data, mounted at `/var/data` (configured in `render.yaml`).
-- Add this line to your README: *"Live demo: https://triagent.onrender.com (first request may take 30s to wake)."*
+- The web service spins down after 15 minutes of inactivity → ~30s cold start on next visit (the frontend shows a "waking server" hint).
+- The free Postgres instance has 1 GB storage and is paused after 90 days of inactivity (Render emails you; one click to unpause).
+- Accounts and tickets persist across restarts and redeploys 🎉
+- Add this line to your README: *"Live demo: https://triagent-n3ok.onrender.com (first request may take 30s to wake)."*
 
 ### Custom domain (optional, ~$10/year)
 
