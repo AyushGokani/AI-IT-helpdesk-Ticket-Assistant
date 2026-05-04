@@ -146,9 +146,10 @@ function bindAuthUi() {
 
   document.getElementById("auth-form").addEventListener("submit", async (e) => {
     e.preventDefault();
+    const form = e.currentTarget;
     const submit = document.getElementById("auth-submit");
     const errEl = document.getElementById("auth-error");
-    const fd = new FormData(e.currentTarget);
+    const fd = new FormData(form);
     const payload = Object.fromEntries(fd.entries());
     submit.disabled = true;
     const original = submit.textContent;
@@ -156,42 +157,52 @@ function bindAuthUi() {
     submit.textContent = `${verb}…`;
     errEl.classList.add("hidden");
 
-    // After ~5s, hint that this is probably a Render free-tier cold start
-    // so the user doesn't think the app is broken.
+    // After ~5s, hint that this is probably a Render free-tier cold start.
     const slowHint = setTimeout(() => {
       submit.textContent = `${verb}… waking server (~30s)`;
     }, 5000);
 
+    const enterApp = async (user) => {
+      state.user = user;
+      try { form.reset(); } catch (_) {}
+      showApp();
+      state.selectedId = null;
+      try { await refresh(); } catch (err) { console.error("refresh failed", err); }
+    };
+
     try {
       const fn = state.authMode === "signup" ? api.signup : api.login;
-      const { ok, body } = await fn(payload);
-      clearTimeout(slowHint);
-      if (!ok) {
-        errEl.textContent = body.error || "Something went wrong.";
+      let result;
+      try {
+        result = await fn(payload);
+      } catch (netErr) {
+        // Network / timeout — the POST may still have succeeded server-side
+        // (common on Render cold starts). Recheck /me before giving up.
+        console.warn("auth fetch threw", netErr);
+        const me = await api.me().catch(() => ({ user: null }));
+        if (me && me.user) {
+          await enterApp(me.user);
+          return;
+        }
+        throw netErr;
+      }
+
+      if (!result.ok) {
+        errEl.textContent = result.body?.error || "Something went wrong.";
         errEl.classList.remove("hidden");
         return;
       }
-      state.user = body.user;
-      e.currentTarget.reset();
-      showApp();
-      state.selectedId = null;
-      await refresh();
+      await enterApp(result.body.user);
     } catch (err) {
-      clearTimeout(slowHint);
-      // Network / timeout — the request might still have succeeded server-side
-      // (which is exactly what bit users on Render cold starts). Re-check /me
-      // before showing an error so we recover gracefully.
-      try {
-        const me = await api.me();
-        if (me.user) {
-          state.user = me.user;
-          e.currentTarget.reset();
-          showApp();
-          state.selectedId = null;
-          await refresh();
-          return;
-        }
-      } catch (_) { /* fall through */ }
+      console.error("auth flow failed", err);
+      // Last-ditch: maybe the cookie IS set even though something downstream
+      // threw. Re-check /me one more time so the user isn't stuck staring at
+      // a misleading error when they're actually logged in.
+      const me = await api.me().catch(() => ({ user: null }));
+      if (me && me.user) {
+        await enterApp(me.user);
+        return;
+      }
       errEl.textContent = "Network error — please try again in a moment.";
       errEl.classList.remove("hidden");
     } finally {
