@@ -169,7 +169,8 @@
           </div>
 
           <div class="rounded-xl border border-slate-200 bg-white shadow-sm p-6">
-            <div class="flex items-center gap-1 rounded-lg bg-slate-100 p-1 mb-5 text-sm font-medium">
+            <!-- Sign in / Create account -->
+            <div id="auth-tabs" class="flex items-center gap-1 rounded-lg bg-slate-100 p-1 mb-5 text-sm font-medium">
               <button data-auth-tab="login"  class="auth-tab flex-1 rounded-md py-1.5 bg-white shadow-sm text-slate-900">Sign in</button>
               <button data-auth-tab="signup" class="auth-tab flex-1 rounded-md py-1.5 text-slate-500 hover:text-slate-700">Create account</button>
             </div>
@@ -186,7 +187,11 @@
                   class="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500" />
               </div>
               <div>
-                <label class="text-xs font-medium text-slate-600">Password</label>
+                <div class="flex items-center justify-between">
+                  <label class="text-xs font-medium text-slate-600">Password</label>
+                  <button type="button" id="forgot-link"
+                    class="text-[11px] font-medium text-indigo-600 hover:underline">Forgot password?</button>
+                </div>
                 <input name="password" type="password" required minlength="8" autocomplete="current-password"
                   class="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500" />
                 <p id="auth-pw-hint" class="hidden mt-1 text-[11px] text-slate-500">At least 8 characters.</p>
@@ -203,6 +208,73 @@
             <p class="mt-4 text-[11px] text-slate-400 text-center">
               Your tickets are stored privately to your account. We hash passwords with PBKDF2.
             </p>
+          </div>
+
+          <!-- Forgot password card (replaces the sign-in card when active) -->
+          <div id="forgot-card" class="hidden rounded-xl border border-slate-200 bg-white shadow-sm p-6">
+            <button id="forgot-back" class="text-xs text-slate-500 hover:text-slate-800 mb-3 inline-flex items-center gap-1">
+              <span aria-hidden="true">←</span> Back to sign in
+            </button>
+
+            <!-- Step indicator -->
+            <ol id="forgot-steps" class="flex items-center gap-2 mb-5 text-[11px] font-medium text-slate-400">
+              <li data-step="1" class="forgot-step text-indigo-600">1. Email</li>
+              <li class="text-slate-300">›</li>
+              <li data-step="2" class="forgot-step">2. Code</li>
+              <li class="text-slate-300">›</li>
+              <li data-step="3" class="forgot-step">3. New password</li>
+            </ol>
+
+            <!-- Step 1: enter email -->
+            <form id="forgot-step1" class="space-y-3">
+              <h3 class="text-sm font-semibold text-slate-800">Reset your password</h3>
+              <p class="text-xs text-slate-500">Enter your account email. We'll send you a 6-digit code.</p>
+              <div>
+                <label class="text-xs font-medium text-slate-600">Email</label>
+                <input name="email" type="email" required autocomplete="email"
+                  class="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500" />
+              </div>
+              <div class="forgot-error hidden rounded-md bg-rose-50 border border-rose-200 px-3 py-2 text-xs text-rose-700"></div>
+              <div class="forgot-info hidden rounded-md bg-emerald-50 border border-emerald-200 px-3 py-2 text-xs text-emerald-700"></div>
+              <button class="w-full rounded-md bg-gradient-to-r from-indigo-600 to-violet-600 px-3 py-2 text-sm font-semibold text-white hover:from-indigo-500 hover:to-violet-500 disabled:opacity-60">
+                Send code
+              </button>
+            </form>
+
+            <!-- Step 2: enter code -->
+            <form id="forgot-step2" class="hidden space-y-3">
+              <h3 class="text-sm font-semibold text-slate-800">Enter the 6-digit code</h3>
+              <p class="text-xs text-slate-500">We sent a code to <span id="forgot-email-echo" class="font-medium text-slate-700"></span>. It expires in 15 minutes.</p>
+              <div>
+                <label class="text-xs font-medium text-slate-600">Code</label>
+                <input name="code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" required autocomplete="one-time-code"
+                  class="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-center font-mono text-lg tracking-[0.4em] focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                  placeholder="••••••" />
+              </div>
+              <div class="forgot-error hidden rounded-md bg-rose-50 border border-rose-200 px-3 py-2 text-xs text-rose-700"></div>
+              <button class="w-full rounded-md bg-gradient-to-r from-indigo-600 to-violet-600 px-3 py-2 text-sm font-semibold text-white hover:from-indigo-500 hover:to-violet-500 disabled:opacity-60">
+                Verify code
+              </button>
+              <button type="button" id="forgot-resend" class="block w-full text-center text-[11px] text-slate-500 hover:text-indigo-600">
+                Didn't get it? Send another code
+              </button>
+            </form>
+
+            <!-- Step 3: new password -->
+            <form id="forgot-step3" class="hidden space-y-3">
+              <h3 class="text-sm font-semibold text-slate-800">Choose a new password</h3>
+              <p class="text-xs text-slate-500">You'll be signed in automatically once it's saved.</p>
+              <div>
+                <label class="text-xs font-medium text-slate-600">New password</label>
+                <input name="new_password" type="password" required minlength="8" autocomplete="new-password"
+                  class="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500" />
+                <p class="mt-1 text-[11px] text-slate-500">At least 8 characters.</p>
+              </div>
+              <div class="forgot-error hidden rounded-md bg-rose-50 border border-rose-200 px-3 py-2 text-xs text-rose-700"></div>
+              <button class="w-full rounded-md bg-gradient-to-r from-indigo-600 to-violet-600 px-3 py-2 text-sm font-semibold text-white hover:from-indigo-500 hover:to-violet-500 disabled:opacity-60">
+                Save password & sign in
+              </button>
+            </form>
           </div>
 
           <p class="mt-4 text-center text-xs text-slate-400">

@@ -28,6 +28,10 @@ const api = {
   async logout()              { return (await fetch("/api/auth/logout", { method: "POST", cache: "no-store" })).json(); },
   async updateName(name)      { const res = await fetch("/api/auth/me", { method: "PATCH", cache: "no-store", headers: { "content-type": "application/json" }, body: JSON.stringify({ name }) }); return { ok: res.ok, body: await res.json() }; },
   async changePassword(p)     { const res = await fetch("/api/auth/change-password", jsonPost(p)); return { ok: res.ok, body: await res.json() }; },
+
+  async forgotPassword(email) { const res = await fetch("/api/auth/forgot-password",  jsonPost({ email })); return { ok: res.ok, body: await res.json() }; },
+  async verifyResetCode(p)    { const res = await fetch("/api/auth/verify-reset-code", jsonPost(p));        return { ok: res.ok, body: await res.json() }; },
+  async resetPassword(p)      { const res = await fetch("/api/auth/reset-password",    jsonPost(p));        return { ok: res.ok, body: await res.json() }; },
 };
 
 const CATEGORY_STYLES = {
@@ -122,6 +126,162 @@ function showApp() {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Forgot-password flow (3 steps: email -> code -> new password)
+// ---------------------------------------------------------------------------
+
+const forgotState = { email: "" };
+
+function showForgotCard(stepN) {
+  document.getElementById("auth-form").parentElement.classList.add("hidden");
+  document.getElementById("auth-tabs").classList.add("hidden");
+  document.getElementById("forgot-card").classList.remove("hidden");
+
+  for (const n of [1, 2, 3]) {
+    document.getElementById(`forgot-step${n}`).classList.toggle("hidden", n !== stepN);
+  }
+  document.querySelectorAll(".forgot-step").forEach((el) => {
+    const n = Number(el.dataset.step);
+    el.classList.toggle("text-indigo-600", n === stepN);
+    el.classList.toggle("text-slate-700", n < stepN);
+    el.classList.toggle("text-slate-400", n > stepN);
+  });
+  // Clear inline alerts on every step transition
+  document.querySelectorAll("#forgot-card .forgot-error, #forgot-card .forgot-info")
+    .forEach((el) => el.classList.add("hidden"));
+}
+
+function showAuthCardFromForgot() {
+  document.getElementById("forgot-card").classList.add("hidden");
+  document.getElementById("auth-form").parentElement.classList.remove("hidden");
+  document.getElementById("auth-tabs").classList.remove("hidden");
+}
+
+function showForgotMessage(form, text, kind) {
+  const cls = kind === "info" ? ".forgot-info" : ".forgot-error";
+  const otherCls = kind === "info" ? ".forgot-error" : ".forgot-info";
+  const el = form.querySelector(cls);
+  const other = form.querySelector(otherCls);
+  if (other) other.classList.add("hidden");
+  if (!el) return;
+  el.textContent = text;
+  el.classList.remove("hidden");
+}
+
+function bindForgotUi() {
+  document.getElementById("forgot-link").addEventListener("click", () => {
+    const emailInput = document.querySelector('#auth-form input[name="email"]');
+    if (emailInput && emailInput.value) {
+      forgotState.email = emailInput.value;
+      document.querySelector('#forgot-step1 input[name="email"]').value = emailInput.value;
+    }
+    showForgotCard(1);
+  });
+
+  document.getElementById("forgot-back").addEventListener("click", showAuthCardFromForgot);
+
+  // STEP 1 — request a code
+  document.getElementById("forgot-step1").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const form = e.currentTarget;
+    const btn = form.querySelector("button[type=submit], button:not([type])");
+    const email = new FormData(form).get("email");
+    btn.disabled = true;
+    const original = btn.textContent;
+    btn.textContent = "Sending…";
+    try {
+      const { ok, body } = await api.forgotPassword(email);
+      if (!ok) {
+        showForgotMessage(form, body?.error || "Could not send code.", "error");
+        return;
+      }
+      forgotState.email = email;
+      document.getElementById("forgot-email-echo").textContent = email;
+      showForgotCard(2);
+    } catch (err) {
+      showForgotMessage(form, "Network error — please try again.", "error");
+    } finally {
+      btn.disabled = false;
+      btn.textContent = original;
+    }
+  });
+
+  // STEP 2 — verify the code
+  document.getElementById("forgot-step2").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const form = e.currentTarget;
+    const btn = form.querySelector("button[type=submit], button:not([type])");
+    const code = new FormData(form).get("code");
+    btn.disabled = true;
+    const original = btn.textContent;
+    btn.textContent = "Verifying…";
+    try {
+      const { ok, body } = await api.verifyResetCode({ email: forgotState.email, code });
+      if (!ok) {
+        showForgotMessage(form, body?.error || "Could not verify code.", "error");
+        return;
+      }
+      forgotState.code = code;
+      showForgotCard(3);
+    } catch (err) {
+      showForgotMessage(form, "Network error — please try again.", "error");
+    } finally {
+      btn.disabled = false;
+      btn.textContent = original;
+    }
+  });
+
+  // STEP 2 — resend code
+  document.getElementById("forgot-resend").addEventListener("click", async () => {
+    if (!forgotState.email) return;
+    const form = document.getElementById("forgot-step2");
+    const { ok } = await api.forgotPassword(forgotState.email);
+    if (ok) {
+      showForgotMessage(form, "A new code is on its way.", "info");
+    } else {
+      showForgotMessage(form, "Could not resend right now.", "error");
+    }
+  });
+
+  // STEP 3 — set new password (auto-login)
+  document.getElementById("forgot-step3").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const form = e.currentTarget;
+    const btn = form.querySelector("button[type=submit], button:not([type])");
+    const new_password = new FormData(form).get("new_password");
+    btn.disabled = true;
+    const original = btn.textContent;
+    btn.textContent = "Saving…";
+    try {
+      const { ok, body } = await api.resetPassword({
+        email: forgotState.email,
+        code: forgotState.code,
+        new_password,
+      });
+      if (!ok) {
+        showForgotMessage(form, body?.error || "Could not reset password.", "error");
+        return;
+      }
+      // Server also created a session; mirror the same enterApp flow as login.
+      state.user = body.user;
+      try { form.reset(); } catch (_) {}
+      document.getElementById("forgot-card").classList.add("hidden");
+      document.getElementById("auth-form").parentElement.classList.remove("hidden");
+      document.getElementById("auth-tabs").classList.remove("hidden");
+      showApp();
+      state.selectedId = null;
+      await new Promise((r) => setTimeout(r, 150));
+      try { await refresh(); } catch (err) { console.error("refresh failed", err); }
+      toast("Password reset — welcome back!");
+    } catch (err) {
+      showForgotMessage(form, "Network error — please try again.", "error");
+    } finally {
+      btn.disabled = false;
+      btn.textContent = original;
+    }
+  });
+}
+
 function setAuthMode(mode) {
   state.authMode = mode;
   document.querySelectorAll(".auth-tab").forEach((b) => {
@@ -143,6 +303,8 @@ function bindAuthUi() {
   document.querySelectorAll(".auth-tab").forEach((b) => {
     b.addEventListener("click", () => setAuthMode(b.dataset.authTab));
   });
+
+  bindForgotUi();
 
   document.getElementById("auth-form").addEventListener("submit", async (e) => {
     e.preventDefault();
