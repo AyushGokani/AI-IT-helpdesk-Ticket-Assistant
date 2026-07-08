@@ -2,15 +2,10 @@
 #
 # Free tier notes:
 #   - Web service spins down after 15 minutes of inactivity (~30s cold start).
-#   - Free Postgres database is provisioned alongside the web service so user
-#     accounts and tickets survive restarts and redeploys.
-#   - DATABASE_URL is auto-injected from the database into the web service.
-databases:
-  - name: triagent-db
-    plan: free
-    databaseName: triagent
-    user: triagent
-
+#   - Postgres is hosted externally on Neon (https://neon.tech) — free forever,
+#     no 90-day auto-delete like Render's free Postgres tier had. Set
+#     DATABASE_URL manually in the Render dashboard using the connection
+#     string Neon provides (postgresql://user:pass@host/db?sslmode=require).
 services:
   - type: web
     name: triagent
@@ -37,9 +32,7 @@ services:
       - key: SESSION_COOKIE_SECURE
         value: "1"
       - key: DATABASE_URL
-        fromDatabase:
-          name: triagent-db
-          property: connectionString
+        sync: false   # Neon connection string, set manually in the Render dashboard
       # ----- Email (password reset codes) -----
       # Set ONE backend in the Render dashboard. If none are set, codes are
       # printed to the service logs (sufficient for a demo).
