@@ -35,10 +35,10 @@ For each ticket Triagent will:
 ## Stack
 
 - **Backend:** Python 3.12 · Flask 3 · SQLAlchemy 2 · OpenAI SDK · gunicorn
-- **Storage:** **Postgres in production**, SQLite locally (zero-config; just `python wsgi.py`)
+- **Storage:** **Neon Postgres** in production (serverless, free forever, autosuspend/wake), SQLite locally (zero-config; just `python wsgi.py`)
 - **Frontend:** single-page HTML + Tailwind (CDN) + vanilla JS — no build step
 - **Tests:** 27 pytest tests against an in-test SQLite, all run in <2s
-- **Deploy:** one-click to Render (free tier) — `render.yaml` provisions both the web service AND a free Postgres database
+- **Deploy:** one-click to Render (free web service) + Neon (free serverless Postgres) — both free forever, `render.yaml` provisions the web service and expects `DATABASE_URL` set to your Neon connection string
 
 ```
 .
@@ -117,17 +117,29 @@ later in Settings).
 2. Sign up at [render.com](https://render.com) — you can sign in with GitHub. **No credit card required for the free tier.**
 3. Click **New → Blueprint** → **Connect** the GitHub repo.
 4. Render reads `render.yaml`, names the service `triagent`, and shows you the env vars it'll create.
-5. The only var you need to fill in manually is `OPENAI_API_KEY` (the rest auto-generate or have defaults). Paste your `sk-...` key. **Or leave it blank and the live demo runs in heuristic mode for free.**
+5. Set two env vars in the Render dashboard:
+   - `OPENAI_API_KEY` = your `sk-...` (or leave blank to run in free heuristic mode)
+   - `DATABASE_URL` = your Neon connection string (see below to grab one for free)
 6. Click **Apply**. First build takes ~3 minutes.
 7. You'll get a public URL like `https://triagent.onrender.com`.
 
 That's it — Triagent is online with HTTPS, auto-deploys on every push to `main`, and seeds 8 example tickets on first boot so visitors immediately see something useful.
 
+### Get a free Neon Postgres (2 min)
+
+Render's own free Postgres tier auto-deletes after ~90 days of inactivity, which will nuke a portfolio demo overnight. Use [Neon](https://neon.tech) instead — free 3 GB Postgres that autosuspends when idle and wakes on first request, no expiry.
+
+1. Sign up at https://console.neon.tech with GitHub — no card required.
+2. **Create Project** → name it `triagent` → region close to your Render service (US East works well with Render's Oregon region too).
+3. On the project page, click **"Connection Details"** or **"Connection String"** → copy the URL (starts with `postgresql://`).
+4. Paste it as `DATABASE_URL` in Render → Environment.
+5. Redeploy the Render service. The app runs `Base.metadata.create_all()` on boot, so the tables get created automatically.
+
 ### Free tier tradeoffs (totally fine for a portfolio demo)
 
-- The web service spins down after 15 minutes of inactivity → ~30s cold start on next visit (the frontend shows a "waking server" hint).
-- The free Postgres instance has 1 GB storage and is paused after 90 days of inactivity (Render emails you; one click to unpause).
-- Accounts and tickets persist across restarts and redeploys 🎉
+- The Render web service spins down after 15 minutes of inactivity → ~30s cold start on next visit (the frontend shows a "waking server" hint).
+- Neon Postgres autosuspends after ~5 minutes idle → adds ~1s to the first request. `pool_pre_ping=True` in `app/db.py` transparently retries the stale connection so users never see an error.
+- Accounts and tickets persist forever — no 90-day expiry, unlike Render's own free Postgres 🎉
 - Add this line to your README: *"Live demo: https://triagent-n3ok.onrender.com (first request may take 30s to wake)."*
 
 ### Custom domain (optional, ~$10/year)
@@ -175,7 +187,7 @@ Just set the same env vars (`OPENAI_API_KEY`, `FLASK_SECRET_KEY`, `OPENAI_MODEL`
 > is fully under control; a keyword-based classifier acts as a free fallback.
 > Deployed on Render with continuous deployment from GitHub.
 >
-> Tech: Python 3.12 · Flask · OpenAI (gpt-4o-mini) · Tailwind · gunicorn · pytest · Render
+> Tech: Python 3.12 · Flask · SQLAlchemy · **Neon Postgres** · OpenAI (gpt-4o-mini) · Resend · Tailwind · gunicorn · pytest · Render
 >
 > 🔗 Live demo: https://triagent.onrender.com
 > 🔗 Code: https://github.com/AyushGokani/AI-IT-helpdesk-Ticket-Assistant
@@ -191,7 +203,7 @@ Just set the same env vars (`OPENAI_API_KEY`, `FLASK_SECRET_KEY`, `OPENAI_MODEL`
 > so token spend stays tiny — and a keyword classifier kicks in as a free fallback
 > for demos. Means the live URL works for anyone visiting without me burning credits.
 >
-> Stack: Python · Flask · OpenAI gpt-4o-mini · Tailwind · gunicorn, deployed on Render.
+> Stack: Python · Flask · SQLAlchemy · **Neon Postgres** · OpenAI gpt-4o-mini · Resend · Tailwind · gunicorn, deployed on Render.
 >
 > Built this to scratch an itch from my IT support / Zendesk days. Happy to chat
 > about the design choices if anyone's curious. 💬

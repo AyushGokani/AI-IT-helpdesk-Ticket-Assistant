@@ -1,9 +1,11 @@
 """Database engine + ORM models.
 
-- Production:  Postgres (Render auto-injects DATABASE_URL).
-- Dev / tests: SQLite (file in DATA_DIR or in-memory).
+- Production:  Postgres on Neon.tech (DATABASE_URL set as an env var on Render).
+- Dev / tests: SQLite (file in DATA_DIR or per-test in tmp_path).
 
 Tables auto-create on app boot (no Alembic for a small project).
+``pool_pre_ping=True`` handles Neon's autosuspend/wake cycle cleanly — the
+first request after idle recycles the stale connection instead of erroring.
 """
 
 from __future__ import annotations
@@ -33,10 +35,17 @@ from sqlalchemy.orm import (
 
 
 def _normalize_db_url(url: str) -> str:
-    """Render still hands out the legacy 'postgres://' scheme; SQLAlchemy 2.x
-    requires 'postgresql://'. Normalize it transparently."""
+    """Some providers hand out the legacy 'postgres://' scheme; SQLAlchemy 2.x
+    requires 'postgresql://'. Normalize it transparently. Also make sure
+    Neon URLs enforce SSL (they usually already do)."""
     if url.startswith("postgres://"):
-        return "postgresql://" + url[len("postgres://"):]
+        url = "postgresql://" + url[len("postgres://"):]
+    # Neon requires SSL. If the URL is plain Postgres and doesn't specify,
+    # append sslmode=require so we don't get 'server does not support SSL'
+    # style errors on connect. SQLite is left untouched.
+    if url.startswith("postgresql://") and "sslmode=" not in url:
+        sep = "&" if "?" in url else "?"
+        url = f"{url}{sep}sslmode=require"
     return url
 
 
