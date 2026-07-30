@@ -1,0 +1,59 @@
+[
+  {
+    "key": "DEMO-101",
+    "summary": "User can log in with email and password",
+    "issue_type": "Story",
+    "status": "To Do",
+    "priority": "High",
+    "description": "As a registered user I want to sign in so I can access my dashboard.",
+    "acceptance_criteria": [
+      "Given I am on the login page",
+      "When I enter a valid email and password and submit",
+      "Then I am redirected to the dashboard",
+      "And I see a welcome message with my name",
+      "Given I am on the login page",
+      "When I enter an invalid password and submit",
+      "Then I remain on the login page",
+      "And I see an error message \"Invalid credentials\""
+    ],
+    "labels": ["auth", "cucumber-ready"]
+  },
+  {
+    "key": "DEMO-102",
+    "summary": "Shopper can add a product to the cart",
+    "issue_type": "Story",
+    "status": "In Progress",
+    "priority": "Medium",
+    "description": "As a shopper I want to add items to my cart so I can check out later.",
+    "acceptance_criteria": [
+      "Given a product \"Wireless Mouse\" is available for $29.99",
+      "And my cart is empty",
+      "When I add \"Wireless Mouse\" to the cart",
+      "Then the cart contains 1 item",
+      "And the cart total is $29.99",
+      "When I add \"Wireless Mouse\" to the cart again",
+      "Then the cart contains 2 items",
+      "And the cart total is $59.98"
+    ],
+    "labels": ["cart", "ecommerce"]
+  },
+  {
+    "key": "DEMO-103",
+    "summary": "Password reset sends a 6-digit code",
+    "issue_type": "Story",
+    "status": "To Do",
+    "priority": "High",
+    "description": "As a user who forgot my password I want a reset code emailed so I can regain access.",
+    "acceptance_criteria": [
+      "Given a user exists with email \"reset.me@example.com\"",
+      "When I request a password reset for \"reset.me@example.com\"",
+      "Then a 6-digit reset code is generated",
+      "And an email is queued to \"reset.me@example.com\"",
+      "When I submit an incorrect reset code",
+      "Then the reset is rejected",
+      "When I submit the correct reset code and a new password",
+      "Then I can log in with the new password"
+    ],
+    "labels": ["auth", "email"]
+  }
+]

@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>CukeForge — Jira to green Cucumber</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <div class="atmosphere" aria-hidden="true"></div>
+
+  <header class="topbar">
+    <div class="brand-mark">CukeForge</div>
+    <div class="mode-pills">
+      <span class="mode" id="jiraMode">Jira: …</span>
+      <span class="mode" id="aiMode">AI: …</span>
+    </div>
+  </header>
+
+  <main>
+    <section class="hero">
+      <p class="brand-hero">CukeForge</p>
+      <h1>Jira tickets in. Passing Cucumber out.</h1>
+      <p class="lede">
+        Pull a story, generate Gherkin + Behave steps with AI, run the suite,
+        and auto-fix until it goes green.
+      </p>
+      <div class="cta-row">
+        <button type="button" class="btn primary" id="btnForge" disabled>
+          Forge &amp; pass tests
+        </button>
+        <label class="toggle">
+          <input type="checkbox" id="useAi" checked />
+          <span>Use AI when key is set</span>
+        </label>
+      </div>
+    </section>
+
+    <section class="workspace" aria-label="Pipeline workspace">
+      <div class="col">
+        <div class="section-head">
+          <h2>Tickets</h2>
+          <p>Select a Jira issue (or demo story).</p>
+        </div>
+        <ul class="ticket-list" id="ticketList"></ul>
+      </div>
+
+      <div class="col">
+        <div class="section-head">
+          <h2>Acceptance</h2>
+          <p id="ticketMeta">Pick a ticket to inspect criteria.</p>
+        </div>
+        <article class="ticket-panel" id="ticketPanel">
+          <p class="empty">No ticket selected.</p>
+        </article>
+      </div>
+
+      <div class="col">
+        <div class="section-head">
+          <h2>Run</h2>
+          <p id="runMeta">Results appear after you forge.</p>
+        </div>
+        <div class="run-panel" id="runPanel">
+          <p class="empty">Waiting for a run.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="artifacts" id="artifacts" hidden>
+      <div class="section-head">
+        <h2>Artifacts</h2>
+        <p>Generated feature file, step definitions, and Behave output.</p>
+      </div>
+      <div class="artifact-grid">
+        <div>
+          <h3>Feature</h3>
+          <pre><code id="featureOut"></code></pre>
+        </div>
+        <div>
+          <h3>Steps</h3>
+          <pre><code id="stepsOut"></code></pre>
+        </div>
+        <div class="span-2">
+          <h3>Behave log</h3>
+          <pre><code id="logOut"></code></pre>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <p>CukeForge · standalone project (Triagent lives at the repo root) · offline heuristic when no credentials are set</p>
+  </footer>
+
+  <script src="/app.js"></script>
+</body>
+</html>
